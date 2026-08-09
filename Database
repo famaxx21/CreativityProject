@@ -91,64 +91,62 @@
             { "Level": 4, "Cost": 6000 }
         ]
     }, 
-
     "Freezer": {
         "DisplayName": "Freezer",
         "Category": "Support",
-        "PlacementCost": 350,
+        "PlacementCost": 450,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 150 },
-            { "Level": 2, "Cost": 350 },
-            { "Level": 3, "Cost": 800 },
-            { "Level": 4, "Cost": 2500 },
-            { "Level": 5, "Cost": 6250 }
+            { "Level": 1, "Cost": 300 },
+            { "Level": 2, "Cost": 450 },
+            { "Level": 3, "Cost": 1700 },
+            { "Level": 4, "Cost": 4500 }
         ]
     },
     "Assassin": {
         "DisplayName": "Assassin",
         "Category": "Offense",
-        "PlacementCost": 800,
+        "PlacementCost": 300,
         "HasSplitPath": false,
         "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 1200 },
-            { "Level": 2, "Cost": 2100 },
-            { "Level": 3, "Cost": 5850 },
-            { "Level": 4, "Cost": 14400 }
+            { "Level": 1, "Cost": 450 },
+            { "Level": 2, "Cost": 750 },
+            { "Level": 3, "Cost": 2400 },
+            { "Level": 4, "Cost": 6350 }
         ]
     },
     "Militant": {
         "DisplayName": "Militant",
         "Category": "Offense",
-        "PlacementCost": 850,
+        "PlacementCost": 600,
         "HasSplitPath": false,
         "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 650 },
+            { "Level": 1, "Cost": 300 },
             { "Level": 2, "Cost": 850 },
-            { "Level": 3, "Cost": 3550 },
-            { "Level": 4, "Cost": 15500 }
+            { "Level": 3, "Cost": 2750 },
+            { "Level": 4, "Cost": 8000 }
         ]
     },
     "Shotgunner": {
         "DisplayName": "Shotgunner",
         "Category": "Offense",
-        "PlacementCost": 400,
+        "PlacementCost": 1225,
         "HasSplitPath": false,
         "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 150 },
-            { "Level": 2, "Cost": 1050 },
-            { "Level": 3, "Cost": 3000 },
-            { "Level": 4, "Cost": 8500 }
+            { "Level": 1, "Cost": 640 },
+            { "Level": 2, "Cost": 1550 },
+            { "Level": 3, "Cost": 6000 },
+            { "Level": 4, "Cost": 18500 }
         ]
     },
     "Hunter": {
         "DisplayName": "Hunter",
         "Category": "Offense",
-        "PlacementCost": 750,
+        "PlacementCost": 1625,
         "HasSplitPath": false,
         "MaxLevel": 4,
         "UpgradeCosts": [
@@ -160,72 +158,72 @@
     },
     "Pyromancer": {
         "DisplayName": "Pyromancer",
-        "Category": "Support",
-        "PlacementCost": 650,
+        "Category": "Offense",
+        "PlacementCost": 900,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 350 },
-            { "Level": 2, "Cost": 400 },
-            { "Level": 3, "Cost": 1400 },
-            { "Level": 4, "Cost": 4500 },
-            { "Level": 5, "Cost": 12000 }
+            { "Level": 1, "Cost": 325 },
+            { "Level": 2, "Cost": 1000 },
+            { "Level": 3, "Cost": 2000 },
+            { "Level": 4, "Cost": 3777 },
+            { "Level": 5, "Cost": 11111 }
         ]
     },
     "Ace Pilot": {
         "DisplayName": "Ace Pilot",
         "Category": "Offense",
-        "PlacementCost": 600,
+        "PlacementCost": 500,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 450 },
-            { "Level": 2, "Cost": 500 },
-            { "Level": 3, "Cost": 1750 },
-            { "Level": 4, "Cost": 3500 },
-            { "Level": 5, "Cost": 8000 }
+            { "Level": 1, "Cost": 225 },
+            { "Level": 2, "Cost": 625 },
+            { "Level": 3, "Cost": 1500 },
+            { "Level": 4, "Cost": 3000 },
+            { "Level": 5, "Cost": 7000 }
         ]
     },
     "Medic": {
         "DisplayName": "Medic",
         "Category": "Support",
-        "PlacementCost": 850,
+        "PlacementCost": 400,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 300 },
-            { "Level": 2, "Cost": 800 },
-            { "Level": 3, "Cost": 1200 },
-            { "Level": 4, "Cost": 4500 },
-            { "Level": 5, "Cost": 9000 }
+            { "Level": 1, "Cost": 425 },
+            { "Level": 2, "Cost": 650 },
+            { "Level": 3, "Cost": 2950 },
+            { "Level": 4, "Cost": 6000 },
+            { "Level": 5, "Cost": 14000 }
         ]
     },
     "Farm": {
         "DisplayName": "Farm",
         "Category": "Support",
-        "PlacementCost": 200,
+        "PlacementCost": 300,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 400 },
+            { "Level": 1, "Cost": 200 },
             { "Level": 2, "Cost": 600 },
-            { "Level": 3, "Cost": 1300 },
+            { "Level": 3, "Cost": 1250 },
             { "Level": 4, "Cost": 2500 },
-            { "Level": 5, "Cost": 5000 }
+            { "Level": 5, "Cost": 4500 }
         ]
     },
     "Electroshocker": {
         "DisplayName": "Electroshocker",
         "Category": "Support",
-        "PlacementCost": 600,
+        "PlacementCost": 650,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 550 },
-            { "Level": 2, "Cost": 750 },
-            { "Level": 3, "Cost": 1825 },
-            { "Level": 4, "Cost": 3500 },
-            { "Level": 5, "Cost": 8500 }
+            { "Level": 1, "Cost": 275 },
+            { "Level": 2, "Cost": 950 },
+            { "Level": 3, "Cost": 2400 },
+            { "Level": 4, "Cost": 4000 },
+            { "Level": 5, "Cost": 10000 }
         ]
     },
     "Rocketeer": {
@@ -235,317 +233,312 @@
         "HasSplitPath": false,
         "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 250 },
-            { "Level": 2, "Cost": 1750 },
-            { "Level": 3, "Cost": 6500 },
-            { "Level": 4, "Cost": 20000 }
+            { "Level": 1, "Cost": 600 },
+            { "Level": 2, "Cost": 1800 },
+            { "Level": 3, "Cost": 6000 },
+            { "Level": 4, "Cost": 18500 }
         ]
     },
     "Trapper": {
         "DisplayName": "Trapper",
         "Category": "Support",
-        "PlacementCost": 1300,
+        "PlacementCost": 500,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 4,
         "UpgradeCosts": [
             { "Level": 1, "Cost": 500 },
-            { "Level": 2, "Cost": 800 },
-            { "Level": 3, "Cost": 1500 },
-            { "Level": 4, "Cost": 2500 },
-            { "Level": 5, "Cost": 5500 }
+            { "Level": 2, "Cost": 1500 },
+            { "Level": 3, "Cost": 6000 },
+            { "Level": 4, "Cost": 11500 }
         ]
     },
     "Military Base": {
         "DisplayName": "Military Base",
         "Category": "Support",
-        "PlacementCost": 2500,
+        "PlacementCost": 400,
         "HasSplitPath": false,
-        "MaxLevel": 6,
+        "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 1800 },
-            { "Level": 2, "Cost": 2000 },
-            { "Level": 3, "Cost": 7000 },
-            { "Level": 4, "Cost": 10000 },
-            { "Level": 5, "Cost": 15000 },
-            { "Level": 6, "Cost": 35000 }
+            { "Level": 1, "Cost": 200 },
+            { "Level": 2, "Cost": 400 },
+            { "Level": 3, "Cost": 2000 },
+            { "Level": 4, "Cost": 7500 },
+            { "Level": 5, "Cost": 25000 }
         ]
     },
     "Crook Boss": {
         "DisplayName": "Crook Boss",
         "Category": "Offense",
-        "PlacementCost": 600,
+        "PlacementCost": 800,
         "HasSplitPath": false,
         "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 250 },
-            { "Level": 2, "Cost": 900 },
-            { "Level": 3, "Cost": 2850 },
-            { "Level": 4, "Cost": 12000 }
+            { "Level": 1, "Cost": 525 },
+            { "Level": 2, "Cost": 1000 },
+            { "Level": 3, "Cost": 5000 },
+            { "Level": 4, "Cost": 16000 }
         ]
     },
-
     "Commander": {
         "DisplayName": "Commander",
         "Category": "Support",
-        "PlacementCost": 2000,
+        "PlacementCost": 650,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 500 },
-            { "Level": 2, "Cost": 1200 },
-            { "Level": 3, "Cost": 3500 },
-            { "Level": 4, "Cost": 7000 },
-            { "Level": 5, "Cost": 15000 }
+            { "Level": 1, "Cost": 400},
+            { "Level": 2, "Cost": 2450},
+            { "Level": 3, "Cost": 4500 },
+            { "Level": 4, "Cost": 14000}
         ]
     },
     "Warden": {
         "DisplayName": "Warden",
         "Category": "Defense",
-        "PlacementCost": 450,
+        "PlacementCost": 1850,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 250 },
-            { "Level": 2, "Cost": 800 },
-            { "Level": 3, "Cost": 1750 },
-            { "Level": 4, "Cost": 3500 },
-            { "Level": 5, "Cost": 12500 }
+            { "Level": 1, "Cost": 975 },
+            { "Level": 2, "Cost": 1987},
+            { "Level": 3, "Cost": 5750 },
+            { "Level": 4, "Cost": 16500}
         ]
     },
     "Cowboy": {
         "DisplayName": "Cowboy",
         "Category": "Offense",
-        "PlacementCost": 600,
+        "PlacementCost": 550,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 250 },
-            { "Level": 2, "Cost": 800 },
-            { "Level": 3, "Cost": 2200 },
-            { "Level": 4, "Cost": 6000 },
-            { "Level": 5, "Cost": 14500 }
+            { "Level": 1, "Cost": 200 },
+            { "Level": 2, "Cost": 600 },
+            { "Level": 3, "Cost": 2000 },
+            { "Level": 4, "Cost": 3000 },
+            { "Level": 5, "Cost": 7777 }
         ]
     },
     "DJ Booth": {
         "DisplayName": "DJ Booth",
         "Category": "Support",
-        "PlacementCost": 500,
+        "PlacementCost": 850,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 250 },
-            { "Level": 2, "Cost": 500 },
-            { "Level": 3, "Cost": 1500 },
-            { "Level": 4, "Cost": 4000 },
-            { "Level": 5, "Cost": 12000 }
+            { "Level": 1, "Cost": 300 },
+            { "Level": 2, "Cost": 1250},
+            { "Level": 3, "Cost": 3000 },
+            { "Level": 4, "Cost": 8000 },
+            { "Level": 5, "Cost": 20000 }
         ]
     },
     "Tesla": {
         "DisplayName": "Tesla",
         "Category": "Offense",
-        "PlacementCost": 700,
+        "PlacementCost": 2000,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 400 },
-            { "Level": 2, "Cost": 900 },
-            { "Level": 3, "Cost": 1800 },
-            { "Level": 4, "Cost": 4000 },
-            { "Level": 5, "Cost": 8500 }
+            { "Level": 1, "Cost": 1856 },
+            { "Level": 2, "Cost": 8888 },
+            { "Level": 3, "Cost": 18450},
+            { "Level": 4, "Cost": 44001}
         ]
     },
     "Saboteur": {
         "DisplayName": "Saboteur",
         "Category": "Support",
-        "PlacementCost": 1250,
+        "PlacementCost": 775,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 750 },
-            { "Level": 2, "Cost": 1500 },
-            { "Level": 3, "Cost": 3000 },
-            { "Level": 4, "Cost": 6000 },
-            { "Level": 5, "Cost": 12500 }
+            { "Level": 1, "Cost": 375 },
+            { "Level": 2, "Cost": 1850 },
+            { "Level": 3, "Cost": 5950 },
+            { "Level": 4, "Cost": 15115}
         ]
     },
     "Minigunner": {
         "DisplayName": "Minigunner",
         "Category": "Offense",
-        "PlacementCost": 2500,
+        "PlacementCost": 1850,
         "HasSplitPath": false,
         "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 650 },
-            { "Level": 2, "Cost": 1200 },
-            { "Level": 3, "Cost": 5000 },
-            { "Level": 4, "Cost": 14000 }
+            { "Level": 1, "Cost": 350 },
+            { "Level": 2, "Cost": 150 },
+            { "Level": 3, "Cost": 6500 },
+            { "Level": 4, "Cost": 21500}
         ]
     },
     "Ranger": {
         "DisplayName": "Ranger",
         "Category": "Offense",
-        "PlacementCost": 3500,
+        "PlacementCost": 4500,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 500 },
-            { "Level": 2, "Cost": 1500 },
-            { "Level": 3, "Cost": 3500 },
-            { "Level": 4, "Cost": 9000 },
-            { "Level": 5, "Cost": 25000 }
+            { "Level": 1, "Cost": 1500 },
+            { "Level": 2, "Cost": 5500 },
+            { "Level": 3, "Cost": 15750 },
+            { "Level": 4, "Cost": 25000 }
         ]
     },
     "Pursuit": {
         "DisplayName": "Pursuit",
         "Category": "Offense",
-        "PlacementCost": 3250,
+        "PlacementCost": 5000,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 500 },
-            { "Level": 2, "Cost": 1500 },
-            { "Level": 3, "Cost": 4000 },
-            { "Level": 4, "Cost": 10000 },
-            { "Level": 5, "Cost": 22000 }
+            { "Level": 1, "Cost": 1750 },
+            { "Level": 2, "Cost": 3000},
+            { "Level": 3, "Cost": 4750 },
+            { "Level": 4, "Cost": 15000 },
+            { "Level": 5, "Cost": 47500 }
         ]
     },
     "Gatling Gun": {
         "DisplayName": "Gatling Gun",
         "Category": "Offense",
-        "PlacementCost": 4500,
+        "PlacementCost": 5250,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 6,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 1000 },
-            { "Level": 2, "Cost": 2500 },
-            { "Level": 3, "Cost": 5000 },
-            { "Level": 4, "Cost": 12000 },
-            { "Level": 5, "Cost": 25000 }
+            { "Level": 1, "Cost": 3000 },
+            { "Level": 2, "Cost": 7500},
+            { "Level": 3, "Cost": 15000 },
+            { "Level": 4, "Cost": 325000 },
+            { "Level": 5, "Cost": 50000 },
+            { "Level": 6, "Cost": 100000}
         ]
     },
     "Turret": {
         "DisplayName": "Turret",
         "Category": "Offense",
-        "PlacementCost": 4000,
+        "PlacementCost": 7750,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 800 },
-            { "Level": 2, "Cost": 1500 },
-            { "Level": 3, "Cost": 4500 },
-            { "Level": 4, "Cost": 9500 },
-            { "Level": 5, "Cost": 30000 }
+            { "Level": 1, "Cost": 3750 },
+            { "Level": 2, "Cost": 7500 },
+            { "Level": 3, "Cost": 20000 },
+            { "Level": 4, "Cost": 35000 },
+            { "Level": 5, "Cost": 65000}
         ]
     },
     "Mortar": {
         "DisplayName": "Mortar",
         "Category": "Offense",
-        "PlacementCost": 1500,
+        "PlacementCost": 1000,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 6,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 450 },
-            { "Level": 2, "Cost": 1500 },
-            { "Level": 3, "Cost": 3000 },
-            { "Level": 4, "Cost": 5500 },
-            { "Level": 5, "Cost": 14000 }
+            { "Level": 1, "Cost": 500 },
+            { "Level": 2, "Cost": 2250 },
+            { "Level": 3, "Cost": 4250 },
+            { "Level": 4, "Cost": 13500},
+            { "Level": 5, "Cost": 30000 },
+            { "Level": 6, "Cost": 45000}
         ]
     },
     "Mercenary Base": {
         "DisplayName": "Mercenary Base",
         "Category": "Support",
-        "PlacementCost": 4000,
+        "PlacementCost": 2750,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 1000 },
-            { "Level": 2, "Cost": 2500 },
-            { "Level": 3, "Cost": 6000 },
-            { "Level": 4, "Cost": 15000 },
-            { "Level": 5, "Cost": 30000 }
+            { "Level": 1, "Cost": 1350},
+            { "Level": 2, "Cost": 2750 },
+            { "Level": 3, "Cost": 9650},
+            { "Level": 4, "Cost": 10000 },
+            { "Level": 5, "Cost": 12500 }
         ]
     },
-
     "Brawler": {
         "DisplayName": "Brawler",
         "Category": "Offense",
-        "PlacementCost": 800,
+        "PlacementCost": 300,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 300 },
+            { "Level": 1, "Cost": 200 },
             { "Level": 2, "Cost": 1200 },
             { "Level": 3, "Cost": 2500 },
-            { "Level": 4, "Cost": 6500 },
-            { "Level": 5, "Cost": 18000 }
+            { "Level": 4, "Cost": 3500 },
+            { "Level": 5, "Cost": 7777 }
         ]
     },
     "Necromancer": {
         "DisplayName": "Necromancer",
         "Category": "Offense",
-        "PlacementCost": 2000,
+        "PlacementCost": 4200,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 400 },
-            { "Level": 2, "Cost": 1250 },
-            { "Level": 3, "Cost": 3500 },
-            { "Level": 4, "Cost": 8500 },
-            { "Level": 5, "Cost": 25000 }
+            { "Level": 1, "Cost": 3950},
+            { "Level": 2, "Cost": 11320 },
+            { "Level": 3, "Cost": 26650 },
+            { "Level": 4, "Cost": 65000 }
         ]
     },
     "Accelerator": {
         "DisplayName": "Accelerator",
         "Category": "Offense",
-        "PlacementCost": 2500,
+        "PlacementCost": 7500,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 500 },
-            { "Level": 2, "Cost": 1500 },
-            { "Level": 3, "Cost": 3500 },
-            { "Level": 4, "Cost": 9500 },
-            { "Level": 5, "Cost": 26000 }
+            { "Level": 1, "Cost": 2000 },
+            { "Level": 2, "Cost": 6000 },
+            { "Level": 3, "Cost": 9999 },
+            { "Level": 4, "Cost": 27500 },
+            { "Level": 5, "Cost": 50000 }
         ]
     },
     "Engineer": {
         "DisplayName": "Engineer",
         "Category": "Offense",
-        "PlacementCost": 4000,
+        "PlacementCost": 600,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 6,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 850 },
-            { "Level": 2, "Cost": 1500 },
-            { "Level": 3, "Cost": 4000 },
-            { "Level": 4, "Cost": 12000 },
-            { "Level": 5, "Cost": 35000 }
+            { "Level": 1, "Cost": 325 },
+            { "Level": 2, "Cost": 900 },
+            { "Level": 3, "Cost": 2077 },
+            { "Level": 4, "Cost": 6250 },
+            { "Level": 5, "Cost": 12500 },
+            { "Level": 6, "Cost": 32500 }
         ]
     },
     "Hacker": {
         "DisplayName": "Hacker",
         "Category": "Support",
-        "PlacementCost": 8862,
+        "PlacementCost": 900,
         "HasSplitPath": true,
         "Paths": {
             "Top": {
                 "PathName": "Overclock",
-                "MaxLevel": 4,
+                "MaxLevel": 5,
                 "UpgradeCosts": [
-                    { "Level": 1, "Cost": 1500 },
-                    { "Level": 2, "Cost": 4000 },
-                    { "Level": 3, "Cost": 12000 },
-                    { "Level": 4, "Cost": 60001 }
+                    { "Level": 1, "Cost": 125 },
+                    { "Level": 2, "Cost": 1337 },
+                    { "Level": 3, "Cost": 6500 },
+                    { "Level": 4, "Cost": 24000 },
+                    { "Level": 5, "Cost": 60001 }
                 ]
             },
             "Bottom": {
                 "PathName": "Rug Pull",
-                "MaxLevel": 4,
+                "MaxLevel": 5,
                 "UpgradeCosts": [
-                    { "Level": 1, "Cost": 1200 },
-                    { "Level": 2, "Cost": 3500 },
-                    { "Level": 3, "Cost": 10000 },
-                    { "Level": 4, "Cost": 53200 }
+                    { "Level": 1, "Cost": 125 },
+                    { "Level": 2, "Cost": 1337 },
+                    { "Level": 3, "Cost": 6500},
+                    { "Level": 4, "Cost": 24000},
+                    { "Level": 5, "Cost": 53200 }
                 ]
             }
         }
@@ -553,84 +546,122 @@
     "Operator": {
         "DisplayName": "Operator",
         "Category": "Offense",
-        "PlacementCost": 1200,
+        "PlacementCost": 300,
         "HasSplitPath": false,
-        "MaxLevel": 5,
+        "MaxLevel": 6,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 400 },
-            { "Level": 2, "Cost": 1000 },
-            { "Level": 3, "Cost": 3200 },
-            { "Level": 4, "Cost": 8500 },
-            { "Level": 5, "Cost": 22000 }
+            { "Level": 1, "Cost": 325 },
+            { "Level": 2, "Cost": 700 },
+            { "Level": 3, "Cost": 1250 },
+            { "Level": 4, "Cost": 1950 },
+            { "Level": 5, "Cost": 3500 },
+            { "Level": 6, "Cost": 38500 }
         ]
     },
     "Kingpin": {
         "DisplayName": "Kingpin",
         "Category": "Offense",
-        "PlacementCost": 1500,
-        "HasSplitPath": false,
-        "MaxLevel": 5,
-        "UpgradeCosts": [
-            { "Level": 1, "Cost": 500 },
-            { "Level": 2, "Cost": 1500 },
-            { "Level": 3, "Cost": 4500 },
-            { "Level": 4, "Cost": 11000 },
-            { "Level": 5, "Cost": 28000 }
-        ]
+        "PlacementCost": 3600,
+        "HasSplitPath": true,
+        "Paths": {
+            "Top": {
+                "PathName": "LV. 999 BOSS",
+                "MaxLevel": 6,
+                "UpgradeCosts": [
+                    { "Level": 1, "Cost": 1400 },
+                    { "Level": 2, "Cost": 4000 },
+                    { "Level": 3, "Cost": 6000 },
+                    { "Level": 4, "Cost": 7250 },
+                    { "Level": 5, "Cost": 16500 },
+                    { "Level": 6, "Cost": 38500 }
+                ]
+            },
+            "Bottom": {
+                "PathName": "Golden Syndicate",
+                "MaxLevel": 6,
+                "UpgradeCosts": [
+                    { "Level": 1, "Cost": 1400 },
+                    { "Level": 2, "Cost": 4000 },
+                    { "Level": 3, "Cost": 6000 },
+                    { "Level": 4, "Cost": 14000 },
+                    { "Level": 5, "Cost": 32500 },
+                    { "Level": 6, "Cost": 64000 }
+                ]
+            }
+        }
     },
     "Juggernaut": {
         "DisplayName": "Juggernaut",
         "Category": "Offense",
-        "PlacementCost": 3000,
-        "HasSplitPath": false,
-        "MaxLevel": 5,
-        "UpgradeCosts": [
-            { "Level": 1, "Cost": 800 },
-            { "Level": 2, "Cost": 2000 },
-            { "Level": 3, "Cost": 5500 },
-            { "Level": 4, "Cost": 14000 },
-            { "Level": 5, "Cost": 35000 }
-        ]
+        "PlacementCost": 8500,
+        "HasSplitPath": true,
+        "Paths": {
+            "Top": {
+                "PathName": "Hammerhead",
+                "MaxLevel": 7,
+                "UpgradeCosts": [
+                    { "Level": 1, "Cost": 3000 },
+                    { "Level": 2, "Cost": 7000 },
+                    { "Level": 3, "Cost": 17200 },
+                    { "Level": 4, "Cost": 35000 },
+                    { "Level": 5, "Cost": 55000 },
+                    { "Level": 6, "Cost": 100000 },
+                    { "Level": 7, "Cost": 175000 }
+                ]
+            },
+            "Bottom": {
+                "PathName": "Thresher",
+                "MaxLevel": 7,
+                "UpgradeCosts": [
+                    { "Level": 1, "Cost": 3000 },
+                    { "Level": 2, "Cost": 7000 },
+                    { "Level": 3, "Cost": 17200 },
+                    { "Level": 4, "Cost": 40000 },
+                    { "Level": 5, "Cost": 95000 },
+                    { "Level": 6, "Cost": 120000 },
+                    { "Level": 7, "Cost": 250000 }
+                ]
+            }
+        }
     },
-    
     "Golden Minigunner": {
         "DisplayName": "Golden Minigunner",
         "Category": "Offense",
-        "PlacementCost": 2750,
+        "PlacementCost": 2400,
         "HasSplitPath": false,
         "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 750 },
-            { "Level": 2, "Cost": 1400 },
-            { "Level": 3, "Cost": 5500 },
-            { "Level": 4, "Cost": 16000 }
+            { "Level": 1, "Cost": 1000 },
+            { "Level": 2, "Cost": 4800 },
+            { "Level": 3, "Cost": 13500 },
+            { "Level": 4, "Cost": 27500 }
         ]
     },
     "Golden Pyromancer": {
         "DisplayName": "Golden Pyromancer",
-        "Category": "Support",
-        "PlacementCost": 750,
+        "Category": "Offense",
+        "PlacementCost": 850,
         "HasSplitPath": false,
         "MaxLevel": 5,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 400 },
-            { "Level": 2, "Cost": 600 },
-            { "Level": 3, "Cost": 1600 },
-            { "Level": 4, "Cost": 4500 },
-            { "Level": 5, "Cost": 15000 }
+            { "Level": 1, "Cost": 325 },
+            { "Level": 2, "Cost": 900 },
+            { "Level": 3, "Cost": 2777 },
+            { "Level": 4, "Cost": 7500 },
+            { "Level": 5, "Cost": 16000 }
         ]
     },
     "Golden Crook Boss": {
         "DisplayName": "Golden Crook Boss",
         "Category": "Offense",
-        "PlacementCost": 700,
+        "PlacementCost": 2400,
         "HasSplitPath": false,
         "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 300 },
-            { "Level": 2, "Cost": 1200 },
-            { "Level": 3, "Cost": 3500 },
-            { "Level": 4, "Cost": 14000 }
+            { "Level": 1, "Cost": 1600 },
+            { "Level": 2, "Cost": 3200 },
+            { "Level": 3, "Cost": 16500 },
+            { "Level": 4, "Cost": 50000 }
         ]
     },
     "Golden Scout": {
@@ -640,24 +671,10 @@
         "HasSplitPath": false,
         "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 100 },
-            { "Level": 2, "Cost": 400 },
-            { "Level": 3, "Cost": 1200 },
-            { "Level": 4, "Cost": 3200 }
-        ]
-    },
-    "Golden Cowboy": {
-        "DisplayName": "Golden Cowboy",
-        "Category": "Offense",
-        "PlacementCost": 700,
-        "HasSplitPath": false,
-        "MaxLevel": 5,
-        "UpgradeCosts": [
-            { "Level": 1, "Cost": 300 },
-            { "Level": 2, "Cost": 900 },
-            { "Level": 3, "Cost": 2500 },
-            { "Level": 4, "Cost": 6500 },
-            { "Level": 5, "Cost": 16000 }
+            { "Level": 1, "Cost": 150 },
+            { "Level": 2, "Cost": 600 },
+            { "Level": 3, "Cost": 1800 },
+            { "Level": 4, "Cost": 4000 }
         ]
     },
     "Golden Soldier": {
@@ -668,23 +685,22 @@
         "MaxLevel": 4,
         "UpgradeCosts": [
             { "Level": 1, "Cost": 150 },
-            { "Level": 2, "Cost": 750 },
-            { "Level": 3, "Cost": 2000 },
-            { "Level": 4, "Cost": 6500 }
+            { "Level": 2, "Cost": 800 },
+            { "Level": 3, "Cost": 3400 },
+            { "Level": 4, "Cost": 11350 }
         ]
     },
     "Golden Demoman": {
         "DisplayName": "Golden Demoman",
         "Category": "Offense",
-        "PlacementCost": 750,
+        "PlacementCost": 875,
         "HasSplitPath": false,
         "MaxLevel": 4,
         "UpgradeCosts": [
-            { "Level": 1, "Cost": 350 },
-            { "Level": 2, "Cost": 1100 },
-            { "Level": 3, "Cost": 2800 },
-            { "Level": 4, "Cost": 7000 }
+            { "Level": 1, "Cost": 250 },
+            { "Level": 2, "Cost": 1150 },
+            { "Level": 3, "Cost": 2650 },
+            { "Level": 4, "Cost": 7750 }
         ]
     }
 }
-
