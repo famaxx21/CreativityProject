@@ -1,6 +1,6 @@
 -- ==========================================
 -- RAJA'S AUTO MACRO PLAYER - TOWER ID SYSTEM
--- Log format: place(id, x, z, "Unit", cost) + upgrade(id, cost)
+-- Setting dari executor via getgenv().MacroSettings
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,11 +10,9 @@ local LocalPlayer = Players.LocalPlayer
 local RemoteEvent = ReplicatedStorage:FindFirstChild("RemoteEvent")
 local RemoteFunction = ReplicatedStorage:FindFirstChild("RemoteFunction")
 
--- ==========================================
--- SETTINGS
--- ==========================================
-local SETTINGS = {
-    StratURL = "https://raw.githubusercontent.com/famaxx21/strat1/main/DARK%20STACKED",
+-- ========== SETTINGS (DARI EXECUTOR ATAU DEFAULT) ==========
+local SETTINGS = getgenv().MacroSettings or {
+    StratURL = "https://raw.githubusercontent.com/famaxx21/CreativityProject/refs/heads/main/DARK%20STACKED",
     AutoCommander = true,
     AutoDJ = true,
     CommanderBuffDuration = 10,
@@ -23,19 +21,16 @@ local SETTINGS = {
     PlaybackDelay = 0.3,
     AutoStart = true,
     AutoStartDelay = 3,
-    DefaultY = 10.720,  -- Ketinggian default buat cari tower
-    CoordTolerance = 5,  -- Toleransi koordinat
+    DefaultY = 10.720,
+    CoordTolerance = 5,
 }
 
--- ========== TOWER REGISTRY ==========
-local towerList = {}  -- [id] = {X, Z, Unit}
+local towerList = {}
 
--- ========== LOGS ==========
 local function Log(msg)
     print("[Raja] " .. msg)
 end
 
--- ========== FIND ALL MY TOWERS ==========
 local function FindAllMyTowers()
     local towers = workspace:FindFirstChild("Towers")
     if not towers then return {} end
@@ -56,18 +51,6 @@ local function FindAllMyTowers()
     return myTowers
 end
 
--- ========== GET PLAYER POSITION ==========
-local function GetPlayerPosition()
-    if LocalPlayer.Character then
-        local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if root then
-            return root.Position.X, root.Position.Y, root.Position.Z
-        end
-    end
-    return 0, 10.720, 0
-end
-
--- ========== PLACE TOWER ==========
 local function PlaceTower(unitName, x, y, z)
     local placementData = {
         Rotation = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
@@ -81,7 +64,6 @@ local function PlaceTower(unitName, x, y, z)
     return success
 end
 
--- ========== PLACE AND TRACK ==========
 local function PlaceAndTrack(towerId, unitName, x, z)
     local y = SETTINGS.DefaultY
     
@@ -90,48 +72,13 @@ local function PlaceAndTrack(towerId, unitName, x, z)
     local success = PlaceTower(unitName, x, y, z)
     
     if success then
-        towerList[towerId] = {
-            X = x,
-            Z = z,
-            Unit = unitName,
-        }
-        
+        towerList[towerId] = { X = x, Z = z, Unit = unitName }
         return true
     end
     
     return false
 end
 
--- ========== FIND TOWER AT XZ ==========
-local function FindTowerAtXZ(x, z, tolerance)
-    tolerance = tolerance or SETTINGS.CoordTolerance
-    local towers = workspace:FindFirstChild("Towers")
-    if not towers then return nil end
-    
-    local bestTower = nil
-    local bestDistance = tolerance
-    
-    for _, tower in ipairs(towers:GetChildren()) do
-        if tower:IsA("Model") then
-            for _, part in ipairs(tower:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    local dx = part.Position.X - x
-                    local dz = part.Position.Z - z
-                    local distance = math.sqrt(dx * dx + dz * dz)
-                    
-                    if distance <= bestDistance then
-                        bestDistance = distance
-                        bestTower = tower
-                    end
-                end
-            end
-        end
-    end
-    
-    return bestTower
-end
-
--- ========== FIND ALL TOWERS AT XZ ==========
 local function FindAllTowersAtXZ(x, z, tolerance)
     tolerance = tolerance or SETTINGS.CoordTolerance
     local towers = workspace:FindFirstChild("Towers")
@@ -159,7 +106,6 @@ local function FindAllTowersAtXZ(x, z, tolerance)
     return matched
 end
 
--- ========== UPGRADE TOWER ==========
 local function UpgradeTower(towerInstance, pathType)
     if not towerInstance or not towerInstance.Parent then return false end
     
@@ -188,7 +134,6 @@ local function UpgradeTower(towerInstance, pathType)
     return success
 end
 
--- ========== UPGRADE TOWER BY ID ==========
 local function UpgradeTowerByID(towerId, pathType)
     local data = towerList[towerId]
     
@@ -211,11 +156,7 @@ local function UpgradeTowerByID(towerId, pathType)
     for _, tower in ipairs(towers) do
         if tower.Parent then
             local success = UpgradeTower(tower, pathType)
-            
-            if success then
-                upgraded = upgraded + 1
-            end
-            
+            if success then upgraded = upgraded + 1 end
             task.wait(0.1)
         end
     end
@@ -223,7 +164,6 @@ local function UpgradeTowerByID(towerId, pathType)
     return upgraded > 0
 end
 
--- ========== FIRE ABILITY ==========
 local function FireAbility(towerInstance, abilityName)
     if not towerInstance or not towerInstance.Parent then return false end
     
@@ -238,7 +178,6 @@ local function FireAbility(towerInstance, abilityName)
     return success
 end
 
--- ========== FIND COMMANDERS ==========
 local function FindAllCommanders()
     local myTowers = FindAllMyTowers()
     local commanders = {}
@@ -255,7 +194,6 @@ local function FindAllCommanders()
     return commanders
 end
 
--- ========== FIND DJ ==========
 local function FindDJ()
     local myTowers = FindAllMyTowers()
     
@@ -281,7 +219,6 @@ local function FindDJ()
     return nil
 end
 
--- ========== CHECK STUN ==========
 local function IsTowerStunned(tower)
     if not tower or not tower.Parent then return false end
     
@@ -306,7 +243,6 @@ local function IsTowerStunned(tower)
     return false
 end
 
--- ========== PARSE MACRO LOG - FORMAT ID ==========
 local function ParseMacroLog(logText)
     local steps = {}
     
@@ -316,7 +252,6 @@ local function ParseMacroLog(logText)
         if line ~= "" and not line:match("^#") and not line:match("^//") then
             local parsed = false
             
-            -- place(id, x, z, "Unit", cost)
             if not parsed then
                 local pid, px, pz, pUnit, pCost = line:match('^place%((%d+),%s*([%-%d%.]+),%s*([%-%d%.]+),%s*"([^"]+)",%s*(%d+)%)$')
                 
@@ -333,7 +268,6 @@ local function ParseMacroLog(logText)
                 end
             end
             
-            -- upgrade(id, cost)
             if not parsed then
                 local uid, uCost = line:match('^upgrade%((%d+),%s*(%d+)%)$')
                 
@@ -347,7 +281,6 @@ local function ParseMacroLog(logText)
                 end
             end
             
-            -- DropTheBeat(id, cost)
             if not parsed then
                 local dbid, dbCost = line:match('^DropTheBeat%((%d+),%s*(%d+)%)$')
                 
@@ -361,7 +294,6 @@ local function ParseMacroLog(logText)
                 end
             end
             
-            -- SetDjTrack(id, "Track", cost)
             if not parsed then
                 local sid, sTrack, sCost = line:match('^SetDjTrack%((%d+),%s*"([^"]+)",%s*(%d+)%)$')
                 
@@ -376,7 +308,6 @@ local function ParseMacroLog(logText)
                 end
             end
             
-            -- CommanderAbility(id, cost)
             if not parsed then
                 local cid, cCost = line:match('^CommanderAbility%((%d+),%s*(%d+)%)$')
                 
@@ -395,7 +326,6 @@ local function ParseMacroLog(logText)
     return steps
 end
 
--- ========== EXECUTE STEP ==========
 local function ExecuteStep(step)
     if not step then return false end
     
@@ -405,26 +335,17 @@ local function ExecuteStep(step)
         return UpgradeTowerByID(step.TowerID, "Top")
     elseif step.Action == "DropTheBeat" then
         local dj = FindDJ()
-        
-        if dj then
-            return FireAbility(dj, "Drop The Beat")
-        end
-        
+        if dj then return FireAbility(dj, "Drop The Beat") end
         return false
     elseif step.Action == "CommanderAbility" then
         local commanders = FindAllCommanders()
-        
-        if #commanders > 0 then
-            return FireAbility(commanders[1], "Call Of Arms")
-        end
-        
+        if #commanders > 0 then return FireAbility(commanders[1], "Call Of Arms") end
         return false
     end
     
     return false
 end
 
--- ========== PLAY MACRO ==========
 local function PlayMacro()
     Log("Loading strat dari GitHub...")
     
@@ -437,10 +358,7 @@ local function PlayMacro()
         return
     end
     
-    Log(string.format("Loaded %d karakter", #logText))
-    
     local steps = ParseMacroLog(logText)
-    
     Log(string.format("Parsed %d steps", #steps))
     
     if #steps == 0 then
@@ -465,7 +383,6 @@ local function PlayMacro()
     Log("✅ Playback complete")
 end
 
--- ========== AUTO ABILITY ==========
 local function StartAutoAbility()
     Log("Auto ability started")
     
@@ -639,7 +556,6 @@ task.spawn(function()
     PlayMacro()
 end)
 
--- ========== EXPORT ==========
 getgenv().RajaMacro = {
     Play = PlayMacro,
     StartAbility = StartAutoAbility,
