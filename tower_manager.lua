@@ -1,6 +1,6 @@
 -- ==========================================
--- TOWER MANAGER - MONITORING
--- Upload: tower_manager.lua
+-- TOWER MANAGER - WITH REGISTER FUNCTIONS
+-- Support stack script registration
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -693,6 +693,7 @@ end)
 -- Initial
 RefreshList()
 
+-- ========== EXPORT ==========
 getgenv().TowerManager = {
     Refresh = RefreshList,
     Select = function(tower)
@@ -707,9 +708,48 @@ getgenv().TowerManager = {
     end,
     Sell = SellTower,
     SellAll = SellAllTowers,
+    
+    -- REGISTER FUNCTIONS BUAT STACK SCRIPT
+    IsTracked = function(tower)
+        return towerRegistry[tower] ~= nil
+    end,
+    
+    RegisterTower = function(tower, unitName, x, z)
+        if not tower or not tower.Parent then return end
+        
+        if not towerNameCounters[unitName] then
+            towerNameCounters[unitName] = 0
+        end
+        
+        towerNameCounters[unitName] = towerNameCounters[unitName] + 1
+        
+        local count = towerNameCounters[unitName]
+        
+        local displayName = unitName
+        
+        if count > 1 then
+            displayName = string.format("%s #%d", unitName, count)
+        end
+        
+        local cost = 0
+        
+        if getgenv().TowerDatabase then
+            cost = getgenv().TowerDatabase.GetCost(unitName)
+        end
+        
+        towerRegistry[tower] = {
+            UnitName = unitName,
+            DisplayName = displayName,
+            Cost = cost,
+        }
+        
+        return displayName
+    end,
 }
 
 print("=================================")
-print("🏗️ TOWER MANAGER LOADED")
-print("Monitoring + Upgrade + Sell")
+print("🏗️ TOWER MANAGER - REGISTER READY")
+print("Stack script bisa pake:")
+print("  getgenv().TowerManager.RegisterTower(tower, unitName)")
+print("  getgenv().TowerManager.IsTracked(tower)")
 print("=================================")
