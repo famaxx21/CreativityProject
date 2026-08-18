@@ -1,6 +1,6 @@
 -- ==========================================
 -- RAJA'S AUTO MACRO PLAYER - TOWER ID SYSTEM
--- Setting dari executor via getgenv().MacroSettings
+-- Full script - setting di executor
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,9 +10,17 @@ local LocalPlayer = Players.LocalPlayer
 local RemoteEvent = ReplicatedStorage:FindFirstChild("RemoteEvent")
 local RemoteFunction = ReplicatedStorage:FindFirstChild("RemoteFunction")
 
--- ========== SETTINGS (DARI EXECUTOR ATAU DEFAULT) ==========
-local SETTINGS = getgenv().MacroSettings or {
-    StratURL = "https://raw.githubusercontent.com/famaxx21/CreativityProject/refs/heads/main/DARK%20STACKED",
+-- ========== SETTINGS (DARI EXECUTOR) ==========
+local SETTINGS = getgenv().MacroSettings
+
+if not SETTINGS then
+    print("=================================")
+    print("[Raja] ❌ MacroSettings belum di-set!")
+    print("=================================")
+    print("Contoh setting di executor:")
+    print([[
+getgenv().MacroSettings = {
+    StratURL = "https://raw.githubusercontent.com/famaxx21/strat1/refs/heads/main/DARK%20STACKED%20V1",
     AutoCommander = true,
     AutoDJ = true,
     CommanderBuffDuration = 10,
@@ -24,6 +32,23 @@ local SETTINGS = getgenv().MacroSettings or {
     DefaultY = 10.720,
     CoordTolerance = 5,
 }
+
+loadstring(game:HttpGet("LOADER_URL"))()
+]])
+    return
+end
+
+-- Default field kalau executor nggak set
+SETTINGS.CommanderBuffDuration = SETTINGS.CommanderBuffDuration or 10
+SETTINGS.CommanderCooldown = SETTINGS.CommanderCooldown or 30
+SETTINGS.DJCooldown = SETTINGS.DJCooldown or 30
+SETTINGS.PlaybackDelay = SETTINGS.PlaybackDelay or 0.3
+SETTINGS.AutoStart = SETTINGS.AutoStart ~= false
+SETTINGS.AutoStartDelay = SETTINGS.AutoStartDelay or 3
+SETTINGS.DefaultY = SETTINGS.DefaultY or 10.720
+SETTINGS.CoordTolerance = SETTINGS.CoordTolerance or 5
+SETTINGS.AutoCommander = SETTINGS.AutoCommander ~= false
+SETTINGS.AutoDJ = SETTINGS.AutoDJ ~= false
 
 local towerList = {}
 
@@ -80,7 +105,7 @@ local function PlaceAndTrack(towerId, unitName, x, z)
 end
 
 local function FindAllTowersAtXZ(x, z, tolerance)
-    tolerance = tolerance or SETTINGS.CoordTolerance
+    tolerance = tolerance or SETTINGS.CoordTolerance or 5
     local towers = workspace:FindFirstChild("Towers")
     if not towers then return {} end
     
