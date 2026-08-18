@@ -1,6 +1,6 @@
 -- ==========================================
--- TOWER MANAGER - WITH REGISTER FUNCTIONS
--- Support stack script registration
+-- TOWER MANAGER - REVISED FINAL
+-- Include RegisterTower + IsTracked
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -709,7 +709,7 @@ getgenv().TowerManager = {
     Sell = SellTower,
     SellAll = SellAllTowers,
     
-    -- REGISTER FUNCTIONS BUAT STACK SCRIPT
+    -- REGISTER FUNCTIONS
     IsTracked = function(tower)
         return towerRegistry[tower] ~= nil
     end,
@@ -748,8 +748,6 @@ getgenv().TowerManager = {
 }
 
 print("=================================")
-print("🏗️ TOWER MANAGER - REGISTER READY")
-print("Stack script bisa pake:")
-print("  getgenv().TowerManager.RegisterTower(tower, unitName)")
-print("  getgenv().TowerManager.IsTracked(tower)")
+print("🏗️ TOWER MANAGER - REVISED")
+print("RegisterTower + IsTracked ready")
 print("=================================")
