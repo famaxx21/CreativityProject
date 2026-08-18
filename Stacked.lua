@@ -1,5 +1,5 @@
 -- ==========================================
--- STACKED - SEARCH FIXED
+-- STACKED - FINAL + SCROLL FIX
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -89,10 +89,8 @@ local function PlaceTowerAt(unitName, x, y, z)
                             if not alreadyTracked then
                                 getgenv().TowerManager.RegisterTower(tower, unitName, x, z)
                                 
-                                if customName ~= "" then
-                                    if getgenv().TowerManager.SetCustomName then
-                                        getgenv().TowerManager.SetCustomName(tower, customName)
-                                    end
+                                if customName ~= "" and getgenv().TowerManager.SetCustomName then
+                                    getgenv().TowerManager.SetCustomName(tower, customName)
                                 end
                                 
                                 break
@@ -135,6 +133,7 @@ local function StackDifferential(unitName, x, y, z, count)
         task.wait(CONFIG.PlaceDelay)
     end
     
+    print(string.format("[Stack] %d/%d placed", placed, count))
     return placed
 end
 
@@ -411,7 +410,7 @@ local HybridCorner = Instance.new("UICorner")
 HybridCorner.CornerRadius = UDim.new(0, 6)
 HybridCorner.Parent = HybridButton
 
--- Side panel
+-- Side panel dengan scroll fix
 local SidePanel = Instance.new("Frame")
 SidePanel.Size = UDim2.new(0, 220, 0, 500)
 SidePanel.Position = UDim2.new(0, 310, 0, 300)
@@ -446,6 +445,12 @@ SideScroll.Position = UDim2.new(0, 0, 0, 50)
 SideScroll.BackgroundTransparency = 1
 SideScroll.ScrollBarThickness = 5
 SideScroll.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 70)
+
+-- SCROLL FIX: Set CanvasSize dynamic
+SideScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+SideScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+SideScroll.CanvasSize = UDim2.new(0, 0, 0, #TOWER_NAMES * 31 + 10)
+
 SideScroll.Parent = SidePanel
 
 local SideLayout = Instance.new("UIListLayout")
@@ -485,14 +490,12 @@ for _, towerName in ipairs(TOWER_NAMES) do
         SidePanel.Visible = false
         SearchInput.Text = ""
         
-        -- Reset visibility setelah pilih
         for _, button in pairs(towerButtons) do
             button.Visible = true
         end
     end)
 end
 
--- Search filter
 SearchInput:GetPropertyChangedSignal("Text"):Connect(function()
     local searchText = SearchInput.Text:lower()
     
@@ -511,7 +514,6 @@ DropdownButton.MouseButton1Click:Connect(function()
     if SidePanel.Visible then
         SearchInput.Text = ""
         
-        -- PASTIKAN SEMUA VISIBLE
         for _, button in pairs(towerButtons) do
             button.Visible = true
         end
@@ -520,7 +522,6 @@ DropdownButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Stack callback
 StackButton.MouseButton1Click:Connect(function()
     local count = tonumber(CountInput.Text) or 10
     local x, y, z = GetPlayerPosition()
@@ -553,7 +554,6 @@ HybridButton.MouseButton1Click:Connect(function()
     end)
 end)
 
--- Minimize
 MinimizeButton.MouseButton1Click:Connect(function()
     local isMinimized = not DropdownButton.Visible
     
@@ -579,7 +579,6 @@ CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- Drag
 local dragging = false
 local dragStart = nil
 local startPos = nil
@@ -631,6 +630,6 @@ getgenv().Stacked = {
 }
 
 print("=================================")
-print("📦 STACKED - SEARCH FIXED")
-print("Evo selalu muncul pas search")
+print("📦 STACKED - SCROLL FIXED")
+print("Semua 55 tower bisa di-scroll")
 print("=================================")
