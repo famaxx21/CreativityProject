@@ -1,6 +1,6 @@
 -- ==========================================
--- TOWER MANAGER + DATABASE INTEGRATION
--- List tower + panel upgrade + cost labeling
+-- TOWER MANAGER - MONITORING
+-- Upload: tower_manager.lua
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,13 +10,174 @@ local LocalPlayer = Players.LocalPlayer
 local RemoteEvent = ReplicatedStorage:FindFirstChild("RemoteEvent")
 local RemoteFunction = ReplicatedStorage:FindFirstChild("RemoteFunction")
 
--- Load database
-loadstring(game:HttpGet("https://raw.githubusercontent.com/famaxx21/CreativityProject/refs/heads/main/tower_database.lua"))()
-
 local towerList = {}
 local selectedTower = nil
 
--- ========== FIND MY TOWERS ==========
+-- ========== REGISTRY ==========
+local towerRegistry = {}
+local pendingPlacements = {}
+local towerNameCounters = {}
+local towerLevels = {}
+
+-- ========== HOOK ==========
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if method == "InvokeServer" and self.Name == "RemoteFunction" then
+        -- Place hook
+        if args[1] == "Troops" and args[2] == "Place" then
+            local placementData = args[3]
+            local unitName = args[4]
+            local position = nil
+            
+            if placementData and type(placementData) == "table" then
+                position = placementData.Position
+            end
+            
+            if unitName and position then
+                table.insert(pendingPlacements, {
+                    UnitName = unitName,
+                    Position = position,
+                    Time = os.clock(),
+                })
+            end
+        end
+        
+        -- Upgrade hook (track level)
+        if args[1] == "Troops" and args[2] == "Upgrade" and args[3] == "Set" then
+            local upgradeData = args[4]
+            
+            if upgradeData and type(upgradeData) == "table" then
+                local upgradedTower = upgradeData.Troop
+                
+                if upgradedTower then
+                    if not towerLevels[upgradedTower] then
+                        towerLevels[upgradedTower] = 0
+                    end
+                    
+                    towerLevels[upgradedTower] = towerLevels[upgradedTower] + 1
+                end
+            end
+        end
+        
+        -- Sell hook
+        if args[1] == "Troops" and args[2] == "Sell" then
+            local sellData = args[3]
+            
+            if sellData and type(sellData) == "table" then
+                local soldTower = sellData.Troop
+                
+                if soldTower then
+                    if selectedTower == soldTower then
+                        selectedTower = nil
+                        task.spawn(function()
+                            task.wait(0.1)
+                            UpdatePanelInfo()
+                        end)
+                    end
+                    
+                    if towerRegistry[soldTower] then
+                        local unitName = towerRegistry[soldTower].UnitName
+                        
+                        if unitName and towerNameCounters[unitName] then
+                            towerNameCounters[unitName] = math.max(0, towerNameCounters[unitName] - 1)
+                        end
+                        
+                        towerRegistry[soldTower] = nil
+                    end
+                    
+                    towerLevels[soldTower] = nil
+                    
+                    task.spawn(function()
+                        task.wait(0.2)
+                        RefreshList()
+                    end)
+                end
+            end
+        end
+    end
+    
+    return oldNamecall(self, ...)
+end)
+
+-- ========== MATCH ==========
+local function MatchTowerWithPlacement(tower)
+    for i = #pendingPlacements, 1, -1 do
+        if os.clock() - pendingPlacements[i].Time > 5 then
+            table.remove(pendingPlacements, i)
+        end
+    end
+    
+    if #pendingPlacements == 0 then return nil end
+    
+    local towerPos = nil
+    
+    for _, part in ipairs(tower:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name == "RootPart" then
+            towerPos = part.Position
+            break
+        end
+    end
+    
+    if not towerPos then
+        for _, part in ipairs(tower:GetDescendants()) do
+            if part:IsA("BasePart") then
+                towerPos = part.Position
+                break
+            end
+        end
+    end
+    
+    if not towerPos then return nil end
+    
+    for i, pending in ipairs(pendingPlacements) do
+        local distance = (towerPos - pending.Position).Magnitude
+        
+        if distance < 10 then
+            table.remove(pendingPlacements, i)
+            return pending
+        end
+    end
+    
+    return nil
+end
+
+-- ========== CLEANUP ==========
+local function CleanupDeletedTowers()
+    local currentTowers = {}
+    
+    local towers = workspace:FindFirstChild("Towers")
+    
+    if towers then
+        for _, tower in ipairs(towers:GetChildren()) do
+            if tower:IsA("Model") then
+                currentTowers[tower] = true
+            end
+        end
+    end
+    
+    for tower, data in pairs(towerRegistry) do
+        if not currentTowers[tower] then
+            local unitName = data.UnitName
+            
+            if unitName and towerNameCounters[unitName] then
+                towerNameCounters[unitName] = math.max(0, towerNameCounters[unitName] - 1)
+            end
+            
+            towerRegistry[tower] = nil
+            towerLevels[tower] = nil
+        end
+    end
+    
+    if selectedTower and not selectedTower.Parent then
+        selectedTower = nil
+        UpgradePanel.Visible = false
+    end
+end
+
+-- ========== FIND ==========
 local function FindAllMyTowers()
     local towers = workspace:FindFirstChild("Towers")
     if not towers then return {} end
@@ -38,58 +199,76 @@ local function FindAllMyTowers()
     return myTowers
 end
 
+local function GetTowerPosition(tower)
+    for _, part in ipairs(tower:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name == "RootPart" then
+            return part.Position
+        end
+    end
+    
+    for _, part in ipairs(tower:GetDescendants()) do
+        if part:IsA("BasePart") then
+            return part.Position
+        end
+    end
+    
+    return nil
+end
+
 -- ========== GET TOWER INFO ==========
 local function GetTowerInfo(tower)
     if not tower or not tower.Parent then return nil end
     
+    local registered = towerRegistry[tower]
+    
     local info = {
         Name = tower.Name,
-        UnitName = tower:GetAttribute("UnitName") or "Unknown",
-        Level = "?",
-        Damage = "?",
-        Range = "?",
-        Cooldown = "?",
-        Cost = 0,
+        UnitName = registered and registered.UnitName or "Unknown",
+        DisplayName = registered and registered.DisplayName or "Unknown",
+        Cost = registered and registered.Cost or 0,
+        Level = tostring(towerLevels[tower] or 0),
+        Position = "?",
     }
     
-    local display = tower:FindFirstChild("Display")
-    if display then
-        local upgrade = display:FindFirstChild("Upgrade")
-        if upgrade then info.Level = tostring(upgrade.Value) end
+    if not registered then
+        local match = MatchTowerWithPlacement(tower)
         
-        local damage = display:FindFirstChild("Damage")
-        if damage then info.Damage = tostring(damage.Value) end
-        
-        local range = display:FindFirstChild("Range")
-        if range then info.Range = tostring(range.Value) end
-        
-        local cooldown = display:FindFirstChild("Cooldown")
-        if cooldown then info.Cooldown = tostring(cooldown.Value) end
+        if match then
+            info.UnitName = match.UnitName
+            
+            if not towerNameCounters[match.UnitName] then
+                towerNameCounters[match.UnitName] = 0
+            end
+            
+            towerNameCounters[match.UnitName] = towerNameCounters[match.UnitName] + 1
+            
+            local count = towerNameCounters[match.UnitName]
+            
+            if count > 1 then
+                info.DisplayName = string.format("%s #%d", match.UnitName, count)
+            else
+                info.DisplayName = match.UnitName
+            end
+            
+            if getgenv().TowerDatabase then
+                info.Cost = getgenv().TowerDatabase.GetCost(match.UnitName)
+            end
+            
+            towerRegistry[tower] = {
+                UnitName = match.UnitName,
+                DisplayName = info.DisplayName,
+                Cost = info.Cost,
+            }
+        end
     end
     
-    -- Get cost dari database
-    if getgenv().TowerDatabase then
-        info.Cost = getgenv().TowerDatabase.GetCost(info.UnitName)
+    local pos = GetTowerPosition(tower)
+    
+    if pos then
+        info.Position = string.format("(%.1f, %.1f, %.1f)", pos.X, pos.Y, pos.Z)
     end
     
     return info
-end
-
--- ========== GET DISPLAY NAME ==========
-local function GetDisplayName(tower, info, index)
-    if not info then return "Unknown" end
-    
-    local costText = ""
-    
-    if info.Cost and info.Cost > 0 then
-        costText = string.format(" ($%d)", info.Cost)
-    end
-    
-    if info.UnitName and info.UnitName ~= "Unknown" and info.UnitName ~= "?" then
-        return string.format("[%d] %s%s", index, info.UnitName, costText)
-    end
-    
-    return string.format("[%d] Tower%s", index, costText)
 end
 
 -- ========== UPGRADE ==========
@@ -121,9 +300,55 @@ local function UpgradeTower(tower, pathType)
             RemoteEvent:FireServer("Streaming", "UnselectTower")
         end)
         
+        task.wait(0.1)
         RefreshList()
         UpdatePanelInfo()
     end)
+end
+
+-- ========== SELL ==========
+local function SellTower(tower)
+    if not tower or not tower.Parent then return end
+    
+    task.spawn(function()
+        task.wait(0.05)
+        
+        pcall(function()
+            RemoteFunction:InvokeServer("Troops", "Sell", {
+                Troop = tower
+            })
+        end)
+        
+        task.wait(0.3)
+        RefreshList()
+        
+        if selectedTower == tower then
+            selectedTower = nil
+            UpgradePanel.Visible = false
+        end
+    end)
+end
+
+local function SellAllTowers()
+    local myTowers = FindAllMyTowers()
+    
+    print(string.format("[Sell] Menjual %d towers...", #myTowers))
+    
+    for i, tower in ipairs(myTowers) do
+        if tower.Parent then
+            pcall(function()
+                RemoteFunction:InvokeServer("Troops", "Sell", {
+                    Troop = tower
+                })
+            end)
+            task.wait(0.1)
+        end
+    end
+    
+    task.wait(1)
+    RefreshList()
+    selectedTower = nil
+    UpgradePanel.Visible = false
 end
 
 -- ========== UI ==========
@@ -133,7 +358,7 @@ ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 260, 0, 380)
+MainFrame.Size = UDim2.new(0, 280, 0, 380)
 MainFrame.Position = UDim2.new(0, 10, 0, 50)
 MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
 MainFrame.BorderSizePixel = 0
@@ -194,9 +419,24 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 4)
 CloseCorner.Parent = CloseButton
 
+local SellAllButton = Instance.new("TextButton")
+SellAllButton.Size = UDim2.new(1, -20, 0, 30)
+SellAllButton.Position = UDim2.new(0, 10, 0, 40)
+SellAllButton.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+SellAllButton.BorderSizePixel = 0
+SellAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SellAllButton.Text = "💰 SELL ALL TOWERS"
+SellAllButton.Font = Enum.Font.GothamBold
+SellAllButton.TextSize = 11
+SellAllButton.Parent = MainFrame
+
+local SellAllCorner = Instance.new("UICorner")
+SellAllCorner.CornerRadius = UDim.new(0, 5)
+SellAllCorner.Parent = SellAllButton
+
 local TowerScroll = Instance.new("ScrollingFrame")
-TowerScroll.Size = UDim2.new(1, 0, 1, -40)
-TowerScroll.Position = UDim2.new(0, 0, 0, 40)
+TowerScroll.Size = UDim2.new(1, 0, 1, -75)
+TowerScroll.Position = UDim2.new(0, 0, 0, 75)
 TowerScroll.BackgroundTransparency = 1
 TowerScroll.ScrollBarThickness = 4
 TowerScroll.ScrollBarImageColor3 = Color3.fromRGB(50, 50, 60)
@@ -213,10 +453,9 @@ TowerPadding.PaddingRight = UDim.new(0, 6)
 TowerPadding.PaddingTop = UDim.new(0, 6)
 TowerPadding.Parent = TowerScroll
 
--- Upgrade panel
 local UpgradePanel = Instance.new("Frame")
-UpgradePanel.Size = UDim2.new(0, 230, 0, 220)
-UpgradePanel.Position = UDim2.new(0, 285, 0, 80)
+UpgradePanel.Size = UDim2.new(0, 230, 0, 280)
+UpgradePanel.Position = UDim2.new(0, 300, 0, 80)
 UpgradePanel.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
 UpgradePanel.BorderSizePixel = 0
 UpgradePanel.Visible = false
@@ -241,14 +480,14 @@ UpgradeTitle.Size = UDim2.new(1, -20, 0, 35)
 UpgradeTitle.Position = UDim2.new(0, 10, 0, 0)
 UpgradeTitle.BackgroundTransparency = 1
 UpgradeTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-UpgradeTitle.Text = "UPGRADE"
+UpgradeTitle.Text = "TOWER INFO"
 UpgradeTitle.Font = Enum.Font.GothamBlack
 UpgradeTitle.TextSize = 12
 UpgradeTitle.TextXAlignment = Enum.TextXAlignment.Left
 UpgradeTitle.Parent = UpgradeHeader
 
 local InfoLabel = Instance.new("TextLabel")
-InfoLabel.Size = UDim2.new(1, -20, 0, 60)
+InfoLabel.Size = UDim2.new(1, -20, 0, 70)
 InfoLabel.Position = UDim2.new(0, 10, 0, 40)
 InfoLabel.BackgroundTransparency = 1
 InfoLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
@@ -260,60 +499,68 @@ InfoLabel.TextYAlignment = Enum.TextYAlignment.Top
 InfoLabel.TextWrapped = true
 InfoLabel.Parent = UpgradePanel
 
-local TopButton = Instance.new("TextButton")
-TopButton.Size = UDim2.new(1, -20, 0, 38)
-TopButton.Position = UDim2.new(0, 10, 0, 105)
-TopButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-TopButton.BorderSizePixel = 0
-TopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-TopButton.Text = "🟩 TOP PATH"
-TopButton.Font = Enum.Font.GothamBold
-TopButton.TextSize = 12
-TopButton.Parent = UpgradePanel
+local UpgradeEButton = Instance.new("TextButton")
+UpgradeEButton.Size = UDim2.new(1, -20, 0, 38)
+UpgradeEButton.Position = UDim2.new(0, 10, 0, 115)
+UpgradeEButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+UpgradeEButton.BorderSizePixel = 0
+UpgradeEButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+UpgradeEButton.Text = "🟩 UPGRADE [E]"
+UpgradeEButton.Font = Enum.Font.GothamBold
+UpgradeEButton.TextSize = 12
+UpgradeEButton.Parent = UpgradePanel
 
-local TopCorner = Instance.new("UICorner")
-TopCorner.CornerRadius = UDim.new(0, 8)
-TopCorner.Parent = TopButton
+local UpgradeECorner = Instance.new("UICorner")
+UpgradeECorner.CornerRadius = UDim.new(0, 8)
+UpgradeECorner.Parent = UpgradeEButton
 
-local BottomButton = Instance.new("TextButton")
-BottomButton.Size = UDim2.new(1, -20, 0, 38)
-BottomButton.Position = UDim2.new(0, 10, 0, 148)
-BottomButton.BackgroundColor3 = Color3.fromRGB(0, 100, 180)
-BottomButton.BorderSizePixel = 0
-BottomButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-BottomButton.Text = "🟦 BOTTOM PATH"
-BottomButton.Font = Enum.Font.GothamBold
-BottomButton.TextSize = 12
-BottomButton.Parent = UpgradePanel
+local UpgradeZButton = Instance.new("TextButton")
+UpgradeZButton.Size = UDim2.new(1, -20, 0, 38)
+UpgradeZButton.Position = UDim2.new(0, 10, 0, 158)
+UpgradeZButton.BackgroundColor3 = Color3.fromRGB(0, 100, 180)
+UpgradeZButton.BorderSizePixel = 0
+UpgradeZButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+UpgradeZButton.Text = "🟦 UPGRADE [Z]"
+UpgradeZButton.Font = Enum.Font.GothamBold
+UpgradeZButton.TextSize = 12
+UpgradeZButton.Parent = UpgradePanel
 
-local BottomCorner = Instance.new("UICorner")
-BottomCorner.CornerRadius = UDim.new(0, 8)
-BottomCorner.Parent = BottomButton
+local UpgradeZCorner = Instance.new("UICorner")
+UpgradeZCorner.CornerRadius = UDim.new(0, 8)
+UpgradeZCorner.Parent = UpgradeZButton
+
+local SellTowerButton = Instance.new("TextButton")
+SellTowerButton.Size = UDim2.new(1, -20, 0, 38)
+SellTowerButton.Position = UDim2.new(0, 10, 0, 201)
+SellTowerButton.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+SellTowerButton.BorderSizePixel = 0
+SellTowerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SellTowerButton.Text = "💰 SELL TOWER"
+SellTowerButton.Font = Enum.Font.GothamBold
+SellTowerButton.TextSize = 12
+SellTowerButton.Parent = UpgradePanel
+
+local SellTowerCorner = Instance.new("UICorner")
+SellTowerCorner.CornerRadius = UDim.new(0, 8)
+SellTowerCorner.Parent = SellTowerButton
 
 -- ========== FUNCTIONS ==========
 local function UpdatePanelInfo()
     if not selectedTower or not selectedTower.Parent then
         UpgradePanel.Visible = false
+        selectedTower = nil
         return
     end
     
     local info = GetTowerInfo(selectedTower)
     
     if info then
-        local costText = ""
-        
-        if info.Cost and info.Cost > 0 then
-            costText = string.format("\n💰 Cost: $%d", info.Cost)
-        end
-        
         InfoLabel.Text = string.format(
-            "🏷️ %s%s\n⚡ Level: %s\n⚔️ Damage: %s\n🎯 Range: %s\n⏱️ Cooldown: %s",
-            info.UnitName,
-            costText,
-            info.Level,
-            info.Damage,
-            info.Range,
-            info.Cooldown
+            "🏷️ %s\n💰 Cost: $%d\n📍 %s\n⚡ Level: %s",
+            info.DisplayName,
+            info.Cost,
+            info.Position,
+            info.Level
         )
         
         UpgradePanel.Visible = true
@@ -321,6 +568,8 @@ local function UpdatePanelInfo()
 end
 
 local function RefreshList()
+    CleanupDeletedTowers()
+    
     for _, child in ipairs(TowerScroll:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
@@ -335,16 +584,21 @@ local function RefreshList()
             local info = GetTowerInfo(tower)
             
             if info then
-                local displayName = GetDisplayName(tower, info, i)
+                local costText = ""
+                
+                if info.Cost and info.Cost > 0 then
+                    costText = string.format("$%d", info.Cost)
+                end
                 
                 local towerButton = Instance.new("TextButton")
-                towerButton.Size = UDim2.new(1, -10, 0, 40)
+                towerButton.Size = UDim2.new(1, -10, 0, 50)
                 towerButton.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
                 towerButton.BorderSizePixel = 0
                 towerButton.TextColor3 = Color3.fromRGB(220, 220, 230)
-                towerButton.Text = string.format("%s\nLv.%s", displayName, info.Level)
+                towerButton.Text = string.format("%s\n💰 %s | 📍 %s | Lv.%s", 
+                    info.DisplayName, costText, info.Position, info.Level)
                 towerButton.Font = Enum.Font.GothamBold
-                towerButton.TextSize = 10
+                towerButton.TextSize = 8
                 towerButton.Parent = TowerScroll
                 
                 local corner = Instance.new("UICorner")
@@ -363,16 +617,26 @@ end
 -- Callbacks
 RefreshButton.MouseButton1Click:Connect(RefreshList)
 
-TopButton.MouseButton1Click:Connect(function()
+UpgradeEButton.MouseButton1Click:Connect(function()
     if selectedTower then
         UpgradeTower(selectedTower, "Top")
     end
 end)
 
-BottomButton.MouseButton1Click:Connect(function()
+UpgradeZButton.MouseButton1Click:Connect(function()
     if selectedTower then
         UpgradeTower(selectedTower, "Bottom")
     end
+end)
+
+SellTowerButton.MouseButton1Click:Connect(function()
+    if selectedTower then
+        SellTower(selectedTower)
+    end
+end)
+
+SellAllButton.MouseButton1Click:Connect(function()
+    SellAllTowers()
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
@@ -404,7 +668,7 @@ Header.InputChanged:Connect(function(input)
         
         UpgradePanel.Position = UDim2.new(
             0,
-            startPos.X.Offset + delta.X + 285,
+            startPos.X.Offset + delta.X + 300,
             0,
             startPos.Y.Offset + delta.Y
         )
@@ -422,6 +686,7 @@ task.spawn(function()
     while true do
         task.wait(2)
         RefreshList()
+        UpdatePanelInfo()
     end
 end)
 
@@ -434,16 +699,17 @@ getgenv().TowerManager = {
         selectedTower = tower
         UpdatePanelInfo()
     end,
-    UpgradeTop = function(tower)
+    UpgradeE = function(tower)
         UpgradeTower(tower or selectedTower, "Top")
     end,
-    UpgradeBottom = function(tower)
+    UpgradeZ = function(tower)
         UpgradeTower(tower or selectedTower, "Bottom")
     end,
+    Sell = SellTower,
+    SellAll = SellAllTowers,
 }
 
 print("=================================")
 print("🏗️ TOWER MANAGER LOADED")
-print("Database integrated")
-print("List tampil: Nama + Cost + Level")
+print("Monitoring + Upgrade + Sell")
 print("=================================")
