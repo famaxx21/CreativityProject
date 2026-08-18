@@ -1,6 +1,6 @@
 -- ==========================================
 -- RAJA'S LOADER - UI SELECTOR
--- Pilih modul yang mau di-load
+-- Checklist pilih modul, klik LOAD
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -41,14 +41,6 @@ local function LoadStack()
     print("[Loader] ✅ Stack loaded")
 end
 
-local function LoadAll()
-    LoadDatabase()
-    LoadMonitor()
-    LoadStack()
-    
-    print("[Loader] ✅ All modules loaded")
-end
-
 -- ========== UI ==========
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "RajaLoaderUI"
@@ -56,8 +48,8 @@ ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 300, 0, 300)
-MainFrame.Position = UDim2.new(0.5, -150, 0.5, -150)
+MainFrame.Size = UDim2.new(0, 300, 0, 350)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -175)
 MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
@@ -88,16 +80,16 @@ TitleLabel.TextSize = 16
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = Header
 
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(0, 150, 0, 20)
-StatusLabel.Position = UDim2.new(0, 15, 0, 30)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
-StatusLabel.Text = "Pilih modul..."
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextSize = 10
-StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusLabel.Parent = Header
+local SubtitleLabel = Instance.new("TextLabel")
+SubtitleLabel.Size = UDim2.new(0, 150, 0, 20)
+SubtitleLabel.Position = UDim2.new(0, 15, 0, 30)
+SubtitleLabel.BackgroundTransparency = 1
+SubtitleLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
+SubtitleLabel.Text = "Pilih modul..."
+SubtitleLabel.Font = Enum.Font.Gotham
+SubtitleLabel.TextSize = 10
+SubtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+SubtitleLabel.Parent = Header
 
 local CloseButton = Instance.new("TextButton")
 CloseButton.Size = UDim2.new(0, 30, 0, 25)
@@ -129,148 +121,151 @@ local MinimizeCorner = Instance.new("UICorner")
 MinimizeCorner.CornerRadius = UDim.new(0, 4)
 MinimizeCorner.Parent = MinimizeButton
 
--- Content
-local ContentFrame = Instance.new("Frame")
-ContentFrame.Size = UDim2.new(1, 0, 1, -50)
-ContentFrame.Position = UDim2.new(0, 0, 0, 50)
-ContentFrame.BackgroundTransparency = 1
-ContentFrame.Parent = MainFrame
+-- Toggle states
+local toggleStates = {
+    Database = true,
+    Monitor = true,
+    Stack = false,
+}
 
--- Database button
-local DatabaseButton = Instance.new("TextButton")
-DatabaseButton.Size = UDim2.new(1, -30, 0, 40)
-DatabaseButton.Position = UDim2.new(0, 15, 0, 10)
-DatabaseButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-DatabaseButton.BorderSizePixel = 0
-DatabaseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-DatabaseButton.Text = "📊 DATABASE"
-DatabaseButton.Font = Enum.Font.GothamBold
-DatabaseButton.TextSize = 13
-DatabaseButton.Parent = ContentFrame
-
-local DatabaseCorner = Instance.new("UICorner")
-DatabaseCorner.CornerRadius = UDim.new(0, 8)
-DatabaseCorner.Parent = DatabaseButton
-
--- Monitor button
-local MonitorButton = Instance.new("TextButton")
-MonitorButton.Size = UDim2.new(1, -30, 0, 40)
-MonitorButton.Position = UDim2.new(0, 15, 0, 60)
-MonitorButton.BackgroundColor3 = Color3.fromRGB(0, 100, 180)
-MonitorButton.BorderSizePixel = 0
-MonitorButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-MonitorButton.Text = "🏗️ MONITOR TOWER"
-MonitorButton.Font = Enum.Font.GothamBold
-MonitorButton.TextSize = 13
-MonitorButton.Parent = ContentFrame
-
-local MonitorCorner = Instance.new("UICorner")
-MonitorCorner.CornerRadius = UDim.new(0, 8)
-MonitorCorner.Parent = MonitorButton
-
--- Stack button
-local StackButton = Instance.new("TextButton")
-StackButton.Size = UDim2.new(1, -30, 0, 40)
-StackButton.Position = UDim2.new(0, 15, 0, 110)
-StackButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-StackButton.BorderSizePixel = 0
-StackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-StackButton.Text = "📦 STACK + UPGRADE"
-StackButton.Font = Enum.Font.GothamBold
-StackButton.TextSize = 13
-StackButton.Parent = ContentFrame
-
-local StackCorner = Instance.new("UICorner")
-StackCorner.CornerRadius = UDim.new(0, 8)
-StackCorner.Parent = StackButton
-
--- Load All button
-local LoadAllButton = Instance.new("TextButton")
-LoadAllButton.Size = UDim2.new(1, -30, 0, 45)
-LoadAllButton.Position = UDim2.new(0, 15, 0, 160)
-LoadAllButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-LoadAllButton.BorderSizePixel = 0
-LoadAllButton.TextColor3 = Color3.fromRGB(0, 0, 0)
-LoadAllButton.Text = "🚀 LOAD ALL"
-LoadAllButton.Font = Enum.Font.GothamBlack
-LoadAllButton.TextSize = 14
-LoadAllButton.Parent = ContentFrame
-
-local LoadAllCorner = Instance.new("UICorner")
-LoadAllCorner.CornerRadius = UDim.new(0, 8)
-LoadAllCorner.Parent = LoadAllButton
-
--- Status list
-local StatusListLabel = Instance.new("TextLabel")
-StatusListLabel.Size = UDim2.new(1, -30, 0, 40)
-StatusListLabel.Position = UDim2.new(0, 15, 0, 215)
-StatusListLabel.BackgroundTransparency = 1
-StatusListLabel.TextColor3 = Color3.fromRGB(100, 100, 110)
-StatusListLabel.Text = "Belum ada modul di-load"
-StatusListLabel.Font = Enum.Font.Gotham
-StatusListLabel.TextSize = 10
-StatusListLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusListLabel.TextYAlignment = Enum.TextYAlignment.Top
-StatusListLabel.TextWrapped = true
-StatusListLabel.Parent = ContentFrame
-
--- ========== UPDATE STATUS ==========
-local function UpdateStatus()
-    local statusText = ""
+-- ========== TOGGLE CREATOR ==========
+local function CreateToggle(name, description, y, callback)
+    local ToggleFrame = Instance.new("Frame")
+    ToggleFrame.Size = UDim2.new(1, -30, 0, 55)
+    ToggleFrame.Position = UDim2.new(0, 15, 0, y)
+    ToggleFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    ToggleFrame.BorderSizePixel = 0
+    ToggleFrame.Parent = MainFrame
     
-    if LOADED_MODULES.Database then
-        statusText = statusText .. "✅ Database\n"
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(0, 8)
+    ToggleCorner.Parent = ToggleFrame
+    
+    local NameLabel = Instance.new("TextLabel")
+    NameLabel.Size = UDim2.new(1, -60, 0, 25)
+    NameLabel.Position = UDim2.new(0, 10, 0, 5)
+    NameLabel.BackgroundTransparency = 1
+    NameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    NameLabel.Text = name
+    NameLabel.Font = Enum.Font.GothamBold
+    NameLabel.TextSize = 12
+    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    NameLabel.Parent = ToggleFrame
+    
+    local DescLabel = Instance.new("TextLabel")
+    DescLabel.Size = UDim2.new(1, -60, 0, 20)
+    DescLabel.Position = UDim2.new(0, 10, 0, 28)
+    DescLabel.BackgroundTransparency = 1
+    DescLabel.TextColor3 = Color3.fromRGB(120, 120, 130)
+    DescLabel.Text = description
+    DescLabel.Font = Enum.Font.Gotham
+    DescLabel.TextSize = 9
+    DescLabel.TextXAlignment = Enum.TextXAlignment.Left
+    DescLabel.Parent = ToggleFrame
+    
+    local ToggleButton = Instance.new("TextButton")
+    ToggleButton.Size = UDim2.new(0, 40, 0, 20)
+    ToggleButton.Position = UDim2.new(1, -50, 0.5, -10)
+    ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    ToggleButton.BorderSizePixel = 0
+    ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleButton.Text = "OFF"
+    ToggleButton.Font = Enum.Font.GothamBold
+    ToggleButton.TextSize = 9
+    ToggleButton.Parent = ToggleFrame
+    
+    local ToggleButtonCorner = Instance.new("UICorner")
+    ToggleButtonCorner.CornerRadius = UDim.new(0, 10)
+    ToggleButtonCorner.Parent = ToggleButton
+    
+    local isOn = false
+    
+    local function UpdateToggle()
+        if isOn then
+            ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+            ToggleButton.Text = "ON"
+        else
+            ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+            ToggleButton.Text = "OFF"
+        end
     end
     
-    if LOADED_MODULES.Monitor then
-        statusText = statusText .. "✅ Monitor\n"
-    end
+    ToggleButton.MouseButton1Click:Connect(function()
+        isOn = not isOn
+        UpdateToggle()
+        
+        if callback then
+            callback(isOn)
+        end
+    end)
     
-    if LOADED_MODULES.Stack then
-        statusText = statusText .. "✅ Stack\n"
-    end
-    
-    if statusText == "" then
-        statusText = "Belum ada modul di-load"
-    end
-    
-    StatusListLabel.Text = statusText
+    return ToggleFrame
 end
 
--- Callbacks
-DatabaseButton.MouseButton1Click:Connect(function()
-    StatusLabel.Text = "Loading database..."
-    task.spawn(function()
-        LoadDatabase()
-        UpdateStatus()
-        StatusLabel.Text = "Database loaded"
-    end)
+-- Database toggle
+CreateToggle("📊 DATABASE", "Tower cost database", 60, function(on)
+    toggleStates.Database = on
 end)
 
-MonitorButton.MouseButton1Click:Connect(function()
-    StatusLabel.Text = "Loading monitor..."
-    task.spawn(function()
-        LoadMonitor()
-        UpdateStatus()
-        StatusLabel.Text = "Monitor loaded"
-    end)
+-- Monitor toggle
+CreateToggle("🏗️ MONITOR TOWER", "Monitoring + upgrade + sell", 120, function(on)
+    toggleStates.Monitor = on
 end)
 
-StackButton.MouseButton1Click:Connect(function()
-    StatusLabel.Text = "Loading stack..."
-    task.spawn(function()
-        LoadStack()
-        UpdateStatus()
-        StatusLabel.Text = "Stack loaded"
-    end)
+-- Stack toggle
+CreateToggle("📦 STACK + UPGRADE", "Stack differential + batch", 180, function(on)
+    toggleStates.Stack = on
 end)
 
-LoadAllButton.MouseButton1Click:Connect(function()
-    StatusLabel.Text = "Loading semua..."
+-- LOAD BUTTON
+local LoadButton = Instance.new("TextButton")
+LoadButton.Size = UDim2.new(1, -30, 0, 50)
+LoadButton.Position = UDim2.new(0, 15, 0, 250)
+LoadButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+LoadButton.BorderSizePixel = 0
+LoadButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+LoadButton.Text = "🚀 LOAD SELECTED"
+LoadButton.Font = Enum.Font.GothamBlack
+LoadButton.TextSize = 14
+LoadButton.Parent = MainFrame
+
+local LoadCorner = Instance.new("UICorner")
+LoadCorner.CornerRadius = UDim.new(0, 8)
+LoadCorner.Parent = LoadButton
+
+-- Status
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -30, 0, 30)
+StatusLabel.Position = UDim2.new(0, 15, 0, 308)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
+StatusLabel.Text = "Ready"
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextSize = 10
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Center
+StatusLabel.Parent = MainFrame
+
+-- ========== LOAD CALLBACK ==========
+LoadButton.MouseButton1Click:Connect(function()
+    StatusLabel.Text = "Loading..."
+    
     task.spawn(function()
-        LoadAll()
-        UpdateStatus()
-        StatusLabel.Text = "Semua loaded"
+        if toggleStates.Database then
+            LoadDatabase()
+        end
+        
+        if toggleStates.Monitor then
+            LoadMonitor()
+        end
+        
+        if toggleStates.Stack then
+            LoadStack()
+        end
+        
+        StatusLabel.Text = "✅ Selesai!"
+        
+        task.wait(2)
+        StatusLabel.Text = "Ready"
     end)
 end)
 
@@ -280,15 +275,23 @@ end)
 
 -- Minimize
 MinimizeButton.MouseButton1Click:Connect(function()
-    local isMinimized = not ContentFrame.Visible
+    local isMinimized = not LoadButton.Visible
     
-    ContentFrame.Visible = not isMinimized
+    LoadButton.Visible = not isMinimized
+    StatusLabel.Visible = not isMinimized
+    
+    -- Hide toggles
+    for _, child in ipairs(MainFrame:GetChildren()) do
+        if child:IsA("Frame") and child ~= Header then
+            child.Visible = not isMinimized
+        end
+    end
     
     if isMinimized then
         MainFrame.Size = UDim2.new(0, 300, 0, 50)
         MinimizeButton.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 300, 0, 300)
+        MainFrame.Size = UDim2.new(0, 300, 0, 350)
         MinimizeButton.Text = "—"
     end
 end)
@@ -324,15 +327,7 @@ game:GetService("UserInputService").InputEnded:Connect(function(input)
     end
 end)
 
--- ========== AUTO LOAD ALL ==========
-task.spawn(function()
-    task.wait(1)
-    LoadAll()
-    UpdateStatus()
-    StatusLabel.Text = "Semua loaded otomatis"
-end)
-
 print("=================================")
 print("👑 RAJA'S LOADER UI")
-print("Pilih modul atau LOAD ALL")
+print("Pilih modul → klik LOAD SELECTED")
 print("=================================")
