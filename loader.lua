@@ -1,6 +1,6 @@
 -- ==========================================
--- RAJA'S AUTO MACRO PLAYER - TOWER ID SYSTEM
--- Full script - setting di executor
+-- RAJA'S AUTO MACRO PLAYER - FIXED WAIT
+-- Tunggu tower beneran muncul sebelum lanjut
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,35 +10,14 @@ local LocalPlayer = Players.LocalPlayer
 local RemoteEvent = ReplicatedStorage:FindFirstChild("RemoteEvent")
 local RemoteFunction = ReplicatedStorage:FindFirstChild("RemoteFunction")
 
--- ========== SETTINGS (DARI EXECUTOR) ==========
+-- ========== SETTINGS ==========
 local SETTINGS = getgenv().MacroSettings
 
 if not SETTINGS then
-    print("=================================")
     print("[Raja] ❌ MacroSettings belum di-set!")
-    print("=================================")
-    print("Contoh setting di executor:")
-    print([[
-getgenv().MacroSettings = {
-    StratURL = "https://raw.githubusercontent.com/famaxx21/strat1/refs/heads/main/DARK%20STACKED%20V1",
-    AutoCommander = true,
-    AutoDJ = true,
-    CommanderBuffDuration = 10,
-    CommanderCooldown = 30,
-    DJCooldown = 30,
-    PlaybackDelay = 0.3,
-    AutoStart = true,
-    AutoStartDelay = 3,
-    DefaultY = 10.720,
-    CoordTolerance = 5,
-}
-
-loadstring(game:HttpGet("LOADER_URL"))()
-]])
     return
 end
 
--- Default field kalau executor nggak set
 SETTINGS.CommanderBuffDuration = SETTINGS.CommanderBuffDuration or 10
 SETTINGS.CommanderCooldown = SETTINGS.CommanderCooldown or 30
 SETTINGS.DJCooldown = SETTINGS.DJCooldown or 30
@@ -49,6 +28,7 @@ SETTINGS.DefaultY = SETTINGS.DefaultY or 10.720
 SETTINGS.CoordTolerance = SETTINGS.CoordTolerance or 5
 SETTINGS.AutoCommander = SETTINGS.AutoCommander ~= false
 SETTINGS.AutoDJ = SETTINGS.AutoDJ ~= false
+SETTINGS.PlaceWaitTimeout = SETTINGS.PlaceWaitTimeout or 5  -- Max tunggu 5 detik
 
 local towerList = {}
 
@@ -76,6 +56,21 @@ local function FindAllMyTowers()
     return myTowers
 end
 
+local function CountAllTowers()
+    local towers = workspace:FindFirstChild("Towers")
+    if not towers then return 0 end
+    
+    local count = 0
+    
+    for _, tower in ipairs(towers:GetChildren()) do
+        if tower:IsA("Model") then
+            count = count + 1
+        end
+    end
+    
+    return count
+end
+
 local function PlaceTower(unitName, x, y, z)
     local placementData = {
         Rotation = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
@@ -89,19 +84,44 @@ local function PlaceTower(unitName, x, y, z)
     return success
 end
 
+-- ========== PLACE AND WAIT FOR TOWER ==========
 local function PlaceAndTrack(towerId, unitName, x, z)
     local y = SETTINGS.DefaultY
     
     Log(string.format("Placing tower %d: %s at (%.2f, %.2f)", towerId, unitName, x, z))
     
+    local countBefore = CountAllTowers()
+    
     local success = PlaceTower(unitName, x, y, z)
     
-    if success then
+    if not success then
+        Log("❌ Place failed")
+        return false
+    end
+    
+    -- Tunggu tower muncul di workspace
+    local towerAppeared = false
+    
+    for i = 1, SETTINGS.PlaceWaitTimeout * 10 do
+        task.wait(0.1)
+        
+        local currentCount = CountAllTowers()
+        
+        if currentCount > countBefore then
+            towerAppeared = true
+            break
+        end
+    end
+    
+    if towerAppeared then
+        Log("✅ Tower muncul")
+        towerList[towerId] = { X = x, Z = z, Unit = unitName }
+        return true
+    else
+        Log("⚠️ Tower belum muncul setelah " .. SETTINGS.PlaceWaitTimeout .. " detik")
         towerList[towerId] = { X = x, Z = z, Unit = unitName }
         return true
     end
-    
-    return false
 end
 
 local function FindAllTowersAtXZ(x, z, tolerance)
@@ -129,6 +149,23 @@ local function FindAllTowersAtXZ(x, z, tolerance)
     end
     
     return matched
+end
+
+-- ========== WAIT FOR TOWER AT XZ ==========
+local function WaitForTowerAtXZ(x, z, maxWait)
+    maxWait = maxWait or SETTINGS.PlaceWaitTimeout or 5
+    
+    for i = 1, maxWait * 10 do
+        local towers = FindAllTowersAtXZ(x, z)
+        
+        if #towers > 0 then
+            return true
+        end
+        
+        task.wait(0.1)
+    end
+    
+    return false
 end
 
 local function UpgradeTower(towerInstance, pathType)
@@ -167,12 +204,15 @@ local function UpgradeTowerByID(towerId, pathType)
         return false
     end
     
-    local towers = FindAllTowersAtXZ(data.X, data.Z)
+    -- Tunggu tower ada di koordinat
+    local towerExists = WaitForTowerAtXZ(data.X, data.Z)
     
-    if #towers == 0 then
+    if not towerExists then
         Log(string.format("No tower at (%.2f, %.2f)", data.X, data.Z))
         return false
     end
+    
+    local towers = FindAllTowersAtXZ(data.X, data.Z)
     
     Log(string.format("Upgrading %d towers at (%.2f, %.2f)", #towers, data.X, data.Z))
     
