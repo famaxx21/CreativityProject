@@ -1,17 +1,15 @@
 -- ==========================================
--- RAJA'S LOADER - MONITOR + STACK
+-- RAJA'S LOADER - DIRECT LINKS
 -- ==========================================
 
-local BASE_URL = "https://raw.githubusercontent.com/famaxx21/CreativityProject/refs/heads/main"
-
--- Load database dulu
-loadstring(game:HttpGet(https://raw.githubusercontent.com/famaxx21/CreativityProject/refs/heads/main/tower_database.lua))()
+-- Load database
+loadstring(game:HttpGet("https://raw.githubusercontent.com/famaxx21/CreativityProject/refs/heads/main/tower_database.lua"))()
 
 -- Load monitor
-loadstring(game:HttpGet(https://raw.githubusercontent.com/famaxx21/CreativityProject/refs/heads/main/tower_manager.lua))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/famaxx21/CreativityProject/refs/heads/main/tower_manager.lua"))()
 
 -- Load stack
-loadstring(https://raw.githubusercontent.com/famaxx21/CreativityProject/refs/heads/main/Stacked.lua))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/famaxx21/CreativityProject/refs/heads/main/Stacked.lua"))()
 
 print("=================================")
 print("MONITOR + STACK LOADED")
