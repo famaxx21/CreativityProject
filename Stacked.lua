@@ -1,6 +1,6 @@
 -- ==========================================
--- STACKED - INTEGRATED WITH TOWER MANAGER
--- Auto register ke Tower Manager setelah place
+-- STACKED - REVISED FINAL
+-- Auto register ke Tower Manager
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -55,22 +55,7 @@ local function GetPlayerPosition()
     return 0, 0, 0
 end
 
-local function CountAllTowers()
-    local towers = workspace:FindFirstChild("Towers")
-    if not towers then return 0 end
-    
-    local count = 0
-    
-    for _, tower in ipairs(towers:GetChildren()) do
-        if tower:IsA("Model") then
-            count = count + 1
-        end
-    end
-    
-    return count
-end
-
--- ========== PLACE TOWER + REGISTER ==========
+-- ========== PLACE + REGISTER ==========
 local function PlaceTowerAt(unitName, x, y, z)
     local placementData = {
         Rotation = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
@@ -81,54 +66,55 @@ local function PlaceTowerAt(unitName, x, y, z)
         return RemoteFunction:InvokeServer("Troops", "Place", placementData, unitName)
     end)
     
-    if success and getgenv().TowerManager then
+    if success then
         -- Tunggu tower muncul
         task.wait(0.3)
         
         -- Cari tower baru dan register
-        local towers = workspace:FindFirstChild("Towers")
-        
-        if towers then
-            for _, tower in ipairs(towers:GetChildren()) do
-                if tower:IsA("Model") then
-                    -- Cek owner
-                    local owner = tower:FindFirstChild("Owner")
-                    local isMine = false
-                    
-                    if owner and owner.Value == LocalPlayer.UserId then
-                        isMine = true
-                    elseif not owner then
-                        isMine = true
-                    end
-                    
-                    if isMine then
-                        -- Cek belum ke-track
-                        local alreadyTracked = false
+        if getgenv().TowerManager and getgenv().TowerManager.RegisterTower then
+            local towers = workspace:FindFirstChild("Towers")
+            
+            if towers then
+                for _, tower in ipairs(towers:GetChildren()) do
+                    if tower:IsA("Model") then
+                        local owner = tower:FindFirstChild("Owner")
+                        local isMine = false
                         
-                        if getgenv().TowerManager.IsTracked then
-                            alreadyTracked = getgenv().TowerManager.IsTracked(tower)
+                        if owner and owner.Value == LocalPlayer.UserId then
+                            isMine = true
+                        elseif not owner then
+                            isMine = true
                         end
                         
-                        if not alreadyTracked then
-                            -- Register
-                            local displayName = getgenv().TowerManager.RegisterTower(tower, unitName, x, z)
+                        if isMine then
+                            local alreadyTracked = false
                             
-                            if displayName then
-                                print(string.format("[Stack] Registered: %s", displayName))
+                            if getgenv().TowerManager.IsTracked then
+                                alreadyTracked = getgenv().TowerManager.IsTracked(tower)
                             end
                             
-                            break
+                            if not alreadyTracked then
+                                local displayName = getgenv().TowerManager.RegisterTower(tower, unitName, x, z)
+                                
+                                if displayName then
+                                    print(string.format("[Register] %s", displayName))
+                                end
+                                
+                                break
+                            end
                         end
                     end
                 end
             end
+        else
+            print("[Register] ⚠️ TowerManager belum ke-load")
         end
     end
     
     return success
 end
 
--- ========== DIFFERENTIAL STACK ==========
+-- ========== STACK DIFFERENTIAL ==========
 local function StackDifferential(unitName, x, y, z, count)
     count = count or CONFIG.StackCount
     
@@ -165,12 +151,9 @@ local function StackDifferential(unitName, x, y, z, count)
     return placed
 end
 
--- ========== UPGRADE TOWER ==========
-local function UpgradeTower(towerInstance, pathType)
+-- ========== UPGRADE ==========
+local function UpgradeTowerFast(towerInstance)
     if not towerInstance or not towerInstance.Parent then return false end
-    
-    local pathNumber = 1
-    if pathType == "Bottom" then pathNumber = 2 end
     
     local realName = towerInstance:GetAttribute("UnitName") or towerInstance.Name
     
@@ -182,7 +165,7 @@ local function UpgradeTower(towerInstance, pathType)
     local success = pcall(function()
         RemoteFunction:InvokeServer("Troops", "Upgrade", "Set", {
             Troop = towerInstance,
-            Path = pathNumber
+            Path = 1
         })
     end)
     task.wait(CONFIG.UpgradeDelay)
@@ -194,6 +177,42 @@ local function UpgradeTower(towerInstance, pathType)
     return success
 end
 
+local function UpgradeTowerList(towerList, targetLevel)
+    targetLevel = targetLevel or CONFIG.TargetLevel
+    
+    print(string.format("[Upgrade] %d towers to Level %d", #towerList, targetLevel))
+    
+    local totalUpgrades = 0
+    
+    for level = 1, targetLevel do
+        local upgradedThisLevel = 0
+        
+        for i, tower in ipairs(towerList) do
+            if tower.Parent then
+                local success = UpgradeTowerFast(tower)
+                
+                if success then
+                    upgradedThisLevel = upgradedThisLevel + 1
+                end
+                
+                task.wait(CONFIG.TowerDelay)
+            end
+        end
+        
+        totalUpgrades = totalUpgrades + upgradedThisLevel
+        
+        print(string.format("  Level %d: %d/%d", level, upgradedThisLevel, #towerList))
+        
+        if upgradedThisLevel == 0 then
+            break
+        end
+        
+        task.wait(CONFIG.LevelDelay)
+    end
+    
+    return totalUpgrades
+end
+
 -- ========== UI ==========
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "StackedUI"
@@ -201,7 +220,7 @@ ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 280, 0, 320)
+MainFrame.Size = UDim2.new(0, 280, 0, 180)
 MainFrame.Position = UDim2.new(0, 10, 0, 440)
 MainFrame.BackgroundColor3 = Color3.fromRGB(13, 13, 20)
 MainFrame.BorderSizePixel = 0
@@ -226,7 +245,7 @@ TitleLabel.Size = UDim2.new(0, 160, 0, 40)
 TitleLabel.Position = UDim2.new(0, 12, 0, 0)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.TextColor3 = Color3.fromRGB(255, 180, 0)
-TitleLabel.Text = "📦 STACK + UPGRADE"
+TitleLabel.Text = "📦 STACKED"
 TitleLabel.Font = Enum.Font.GothamBlack
 TitleLabel.TextSize = 13
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -278,6 +297,7 @@ local DropdownCorner = Instance.new("UICorner")
 DropdownCorner.CornerRadius = UDim.new(0, 5)
 DropdownCorner.Parent = DropdownButton
 
+-- Count input
 local CountInput = Instance.new("TextBox")
 CountInput.Size = UDim2.new(1, -24, 0, 28)
 CountInput.Position = UDim2.new(0, 12, 0, 90)
@@ -295,13 +315,14 @@ local CountCorner = Instance.new("UICorner")
 CountCorner.CornerRadius = UDim.new(0, 5)
 CountCorner.Parent = CountInput
 
+-- Stack button
 local StackButton = Instance.new("TextButton")
 StackButton.Size = UDim2.new(1, -24, 0, 38)
 StackButton.Position = UDim2.new(0, 12, 0, 128)
 StackButton.BackgroundColor3 = Color3.fromRGB(0, 100, 180)
 StackButton.BorderSizePixel = 0
 StackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-StackButton.Text = "📦 STACK ONLY"
+StackButton.Text = "📦 STACK"
 StackButton.Font = Enum.Font.GothamBold
 StackButton.TextSize = 13
 StackButton.Parent = MainFrame
@@ -310,7 +331,7 @@ local StackCorner = Instance.new("UICorner")
 StackCorner.CornerRadius = UDim.new(0, 8)
 StackCorner.Parent = StackButton
 
--- Side panel tower list
+-- Side panel
 local SidePanel = Instance.new("Frame")
 SidePanel.Size = UDim2.new(0, 220, 0, 400)
 SidePanel.Position = UDim2.new(0, 310, 0, 370)
@@ -396,6 +417,7 @@ SearchInput:GetPropertyChangedSignal("Text"):Connect(function()
     end
 end)
 
+-- Callbacks
 DropdownButton.MouseButton1Click:Connect(function()
     SidePanel.Visible = not SidePanel.Visible
     SearchInput.Text = ""
@@ -422,7 +444,7 @@ MinimizeButton.MouseButton1Click:Connect(function()
         MainFrame.Size = UDim2.new(0, 280, 0, 40)
         MinimizeButton.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 280, 0, 320)
+        MainFrame.Size = UDim2.new(0, 280, 0, 180)
         MinimizeButton.Text = "—"
     end
 end)
@@ -473,9 +495,10 @@ end)
 getgenv().Stacked = {
     Stack = StackDifferential,
     Place = PlaceTowerAt,
+    Upgrade = UpgradeTowerList,
 }
 
 print("=================================")
-print("📦 STACKED - INTEGRATED")
+print("📦 STACKED - REVISED")
 print("Auto register ke Tower Manager")
 print("=================================")
