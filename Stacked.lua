@@ -1,6 +1,5 @@
 -- ==========================================
--- STACKED - REVISED FINAL
--- Auto register ke Tower Manager
+-- STACKED - SEARCH FIXED
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,8 +21,6 @@ local CONFIG = {
     LevelDelay = 0.3,
     TargetLevel = 3,
     CoordinateTolerance = 10,
-    WaitForTower = true,
-    PlaceWaitTimeout = 5,
 }
 
 local TOWER_NAMES = {
@@ -42,8 +39,7 @@ local TOWER_NAMES = {
 }
 
 local selectedUnit = "EvolvedOperator"
-local towerBatches = {}
-local currentBatch = 0
+local customName = ""
 
 local function GetPlayerPosition()
     if LocalPlayer.Character then
@@ -55,7 +51,6 @@ local function GetPlayerPosition()
     return 0, 0, 0
 end
 
--- ========== PLACE + REGISTER ==========
 local function PlaceTowerAt(unitName, x, y, z)
     local placementData = {
         Rotation = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
@@ -67,10 +62,8 @@ local function PlaceTowerAt(unitName, x, y, z)
     end)
     
     if success then
-        -- Tunggu tower muncul
         task.wait(0.3)
         
-        -- Cari tower baru dan register
         if getgenv().TowerManager and getgenv().TowerManager.RegisterTower then
             local towers = workspace:FindFirstChild("Towers")
             
@@ -94,10 +87,12 @@ local function PlaceTowerAt(unitName, x, y, z)
                             end
                             
                             if not alreadyTracked then
-                                local displayName = getgenv().TowerManager.RegisterTower(tower, unitName, x, z)
+                                getgenv().TowerManager.RegisterTower(tower, unitName, x, z)
                                 
-                                if displayName then
-                                    print(string.format("[Register] %s", displayName))
+                                if customName ~= "" then
+                                    if getgenv().TowerManager.SetCustomName then
+                                        getgenv().TowerManager.SetCustomName(tower, customName)
+                                    end
                                 end
                                 
                                 break
@@ -106,22 +101,16 @@ local function PlaceTowerAt(unitName, x, y, z)
                     end
                 end
             end
-        else
-            print("[Register] ⚠️ TowerManager belum ke-load")
         end
     end
     
     return success
 end
 
--- ========== STACK DIFFERENTIAL ==========
 local function StackDifferential(unitName, x, y, z, count)
     count = count or CONFIG.StackCount
     
     print(string.format("[Stack] %d x %s", count, unitName))
-    
-    currentBatch = currentBatch + 1
-    local batchNumber = currentBatch
     
     local placed = 0
     
@@ -146,12 +135,44 @@ local function StackDifferential(unitName, x, y, z, count)
         task.wait(CONFIG.PlaceDelay)
     end
     
-    print(string.format("[Stack] Batch %d: %d/%d placed", batchNumber, placed, count))
-    
     return placed
 end
 
--- ========== UPGRADE ==========
+local function FindTowersAtPosition(x, y, z, tolerance)
+    tolerance = tolerance or CONFIG.CoordinateTolerance
+    local towers = workspace:FindFirstChild("Towers")
+    if not towers then return {} end
+    
+    local targetPos = Vector3.new(x, y, z)
+    local matched = {}
+    
+    for _, tower in ipairs(towers:GetChildren()) do
+        if tower:IsA("Model") then
+            local owner = tower:FindFirstChild("Owner")
+            local isMine = false
+            
+            if owner and owner.Value == LocalPlayer.UserId then
+                isMine = true
+            elseif not owner then
+                isMine = true
+            end
+            
+            if isMine then
+                for _, part in ipairs(tower:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        if (part.Position - targetPos).Magnitude <= tolerance then
+                            table.insert(matched, tower)
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return matched
+end
+
 local function UpgradeTowerFast(towerInstance)
     if not towerInstance or not towerInstance.Parent then return false end
     
@@ -177,17 +198,15 @@ local function UpgradeTowerFast(towerInstance)
     return success
 end
 
-local function UpgradeTowerList(towerList, targetLevel)
+local function UpgradeToLevel(towers, targetLevel)
     targetLevel = targetLevel or CONFIG.TargetLevel
-    
-    print(string.format("[Upgrade] %d towers to Level %d", #towerList, targetLevel))
     
     local totalUpgrades = 0
     
     for level = 1, targetLevel do
         local upgradedThisLevel = 0
         
-        for i, tower in ipairs(towerList) do
+        for i, tower in ipairs(towers) do
             if tower.Parent then
                 local success = UpgradeTowerFast(tower)
                 
@@ -201,11 +220,7 @@ local function UpgradeTowerList(towerList, targetLevel)
         
         totalUpgrades = totalUpgrades + upgradedThisLevel
         
-        print(string.format("  Level %d: %d/%d", level, upgradedThisLevel, #towerList))
-        
-        if upgradedThisLevel == 0 then
-            break
-        end
+        if upgradedThisLevel == 0 then break end
         
         task.wait(CONFIG.LevelDelay)
     end
@@ -220,7 +235,7 @@ ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 280, 0, 180)
+MainFrame.Size = UDim2.new(0, 280, 0, 340)
 MainFrame.Position = UDim2.new(0, 10, 0, 440)
 MainFrame.BackgroundColor3 = Color3.fromRGB(13, 13, 20)
 MainFrame.BorderSizePixel = 0
@@ -245,7 +260,7 @@ TitleLabel.Size = UDim2.new(0, 160, 0, 40)
 TitleLabel.Position = UDim2.new(0, 12, 0, 0)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.TextColor3 = Color3.fromRGB(255, 180, 0)
-TitleLabel.Text = "📦 STACKED"
+TitleLabel.Text = "📦 STACK + UPGRADE"
 TitleLabel.Font = Enum.Font.GothamBlack
 TitleLabel.TextSize = 13
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -281,7 +296,6 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 4)
 CloseCorner.Parent = CloseButton
 
--- Dropdown
 local DropdownButton = Instance.new("TextButton")
 DropdownButton.Size = UDim2.new(1, -24, 0, 32)
 DropdownButton.Position = UDim2.new(0, 12, 0, 50)
@@ -297,10 +311,30 @@ local DropdownCorner = Instance.new("UICorner")
 DropdownCorner.CornerRadius = UDim.new(0, 5)
 DropdownCorner.Parent = DropdownButton
 
--- Count input
+local NameInput = Instance.new("TextBox")
+NameInput.Size = UDim2.new(1, -24, 0, 28)
+NameInput.Position = UDim2.new(0, 12, 0, 90)
+NameInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+NameInput.BorderSizePixel = 0
+NameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+NameInput.PlaceholderText = "Tower Name (kosong = auto)"
+NameInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
+NameInput.Font = Enum.Font.GothamBold
+NameInput.TextSize = 11
+NameInput.Text = ""
+NameInput.Parent = MainFrame
+
+local NameCorner = Instance.new("UICorner")
+NameCorner.CornerRadius = UDim.new(0, 5)
+NameCorner.Parent = NameInput
+
+NameInput:GetPropertyChangedSignal("Text"):Connect(function()
+    customName = NameInput.Text
+end)
+
 local CountInput = Instance.new("TextBox")
 CountInput.Size = UDim2.new(1, -24, 0, 28)
-CountInput.Position = UDim2.new(0, 12, 0, 90)
+CountInput.Position = UDim2.new(0, 12, 0, 125)
 CountInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 CountInput.BorderSizePixel = 0
 CountInput.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -315,26 +349,72 @@ local CountCorner = Instance.new("UICorner")
 CountCorner.CornerRadius = UDim.new(0, 5)
 CountCorner.Parent = CountInput
 
--- Stack button
+local LevelInput = Instance.new("TextBox")
+LevelInput.Size = UDim2.new(1, -24, 0, 28)
+LevelInput.Position = UDim2.new(0, 12, 0, 160)
+LevelInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+LevelInput.BorderSizePixel = 0
+LevelInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+LevelInput.PlaceholderText = "Level (buat upgrade)"
+LevelInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
+LevelInput.Font = Enum.Font.GothamBold
+LevelInput.TextSize = 12
+LevelInput.Text = "3"
+LevelInput.Parent = MainFrame
+
+local LevelCorner = Instance.new("UICorner")
+LevelCorner.CornerRadius = UDim.new(0, 5)
+LevelCorner.Parent = LevelInput
+
 local StackButton = Instance.new("TextButton")
-StackButton.Size = UDim2.new(1, -24, 0, 38)
-StackButton.Position = UDim2.new(0, 12, 0, 128)
+StackButton.Size = UDim2.new(1, -24, 0, 35)
+StackButton.Position = UDim2.new(0, 12, 0, 195)
 StackButton.BackgroundColor3 = Color3.fromRGB(0, 100, 180)
 StackButton.BorderSizePixel = 0
 StackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-StackButton.Text = "📦 STACK"
+StackButton.Text = "📦 STACK ONLY"
 StackButton.Font = Enum.Font.GothamBold
-StackButton.TextSize = 13
+StackButton.TextSize = 12
 StackButton.Parent = MainFrame
 
 local StackCorner = Instance.new("UICorner")
-StackCorner.CornerRadius = UDim.new(0, 8)
+StackCorner.CornerRadius = UDim.new(0, 6)
 StackCorner.Parent = StackButton
+
+local UpgradeButton = Instance.new("TextButton")
+UpgradeButton.Size = UDim2.new(1, -24, 0, 35)
+UpgradeButton.Position = UDim2.new(0, 12, 0, 235)
+UpgradeButton.BackgroundColor3 = Color3.fromRGB(150, 100, 0)
+UpgradeButton.BorderSizePixel = 0
+UpgradeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+UpgradeButton.Text = "⬆️ UPGRADE ONLY"
+UpgradeButton.Font = Enum.Font.GothamBold
+UpgradeButton.TextSize = 12
+UpgradeButton.Parent = MainFrame
+
+local UpgradeCorner = Instance.new("UICorner")
+UpgradeCorner.CornerRadius = UDim.new(0, 6)
+UpgradeCorner.Parent = UpgradeButton
+
+local HybridButton = Instance.new("TextButton")
+HybridButton.Size = UDim2.new(1, -24, 0, 40)
+HybridButton.Position = UDim2.new(0, 12, 0, 275)
+HybridButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+HybridButton.BorderSizePixel = 0
+HybridButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+HybridButton.Text = "🚀 STACK + UPGRADE"
+HybridButton.Font = Enum.Font.GothamBold
+HybridButton.TextSize = 13
+HybridButton.Parent = MainFrame
+
+local HybridCorner = Instance.new("UICorner")
+HybridCorner.CornerRadius = UDim.new(0, 6)
+HybridCorner.Parent = HybridButton
 
 -- Side panel
 local SidePanel = Instance.new("Frame")
-SidePanel.Size = UDim2.new(0, 220, 0, 400)
-SidePanel.Position = UDim2.new(0, 310, 0, 370)
+SidePanel.Size = UDim2.new(0, 220, 0, 500)
+SidePanel.Position = UDim2.new(0, 310, 0, 300)
 SidePanel.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
 SidePanel.BorderSizePixel = 0
 SidePanel.Visible = false
@@ -383,13 +463,14 @@ local towerButtons = {}
 
 for _, towerName in ipairs(TOWER_NAMES) do
     local itemButton = Instance.new("TextButton")
-    itemButton.Size = UDim2.new(1, -12, 0, 30)
+    itemButton.Size = UDim2.new(1, -12, 0, 28)
     itemButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
     itemButton.BorderSizePixel = 0
     itemButton.TextColor3 = Color3.fromRGB(220, 220, 230)
     itemButton.Text = towerName
     itemButton.Font = Enum.Font.GothamBold
-    itemButton.TextSize = 12
+    itemButton.TextSize = 11
+    itemButton.Visible = true
     itemButton.Parent = SideScroll
     
     local itemCorner = Instance.new("UICorner")
@@ -402,27 +483,44 @@ for _, towerName in ipairs(TOWER_NAMES) do
         selectedUnit = towerName
         DropdownButton.Text = "🔽 " .. selectedUnit
         SidePanel.Visible = false
+        SearchInput.Text = ""
+        
+        -- Reset visibility setelah pilih
+        for _, button in pairs(towerButtons) do
+            button.Visible = true
+        end
     end)
 end
 
+-- Search filter
 SearchInput:GetPropertyChangedSignal("Text"):Connect(function()
     local searchText = SearchInput.Text:lower()
     
     for towerName, button in pairs(towerButtons) do
-        if searchText == "" or towerName:lower():find(searchText, 1, true) then
+        if searchText == "" then
             button.Visible = true
         else
-            button.Visible = false
+            button.Visible = towerName:lower():find(searchText, 1, true) ~= nil
         end
     end
 end)
 
--- Callbacks
 DropdownButton.MouseButton1Click:Connect(function()
     SidePanel.Visible = not SidePanel.Visible
-    SearchInput.Text = ""
+    
+    if SidePanel.Visible then
+        SearchInput.Text = ""
+        
+        -- PASTIKAN SEMUA VISIBLE
+        for _, button in pairs(towerButtons) do
+            button.Visible = true
+        end
+        
+        SideScroll.CanvasPosition = Vector2.new(0, 0)
+    end
 end)
 
+-- Stack callback
 StackButton.MouseButton1Click:Connect(function()
     local count = tonumber(CountInput.Text) or 10
     local x, y, z = GetPlayerPosition()
@@ -432,19 +530,46 @@ StackButton.MouseButton1Click:Connect(function()
     end)
 end)
 
+UpgradeButton.MouseButton1Click:Connect(function()
+    local level = tonumber(LevelInput.Text) or 3
+    local x, y, z = GetPlayerPosition()
+    
+    task.spawn(function()
+        local towers = FindTowersAtPosition(x, y, z)
+        UpgradeToLevel(towers, level)
+    end)
+end)
+
+HybridButton.MouseButton1Click:Connect(function()
+    local count = tonumber(CountInput.Text) or 10
+    local level = tonumber(LevelInput.Text) or 3
+    local x, y, z = GetPlayerPosition()
+    
+    task.spawn(function()
+        StackDifferential(selectedUnit, x, y, z, count)
+        task.wait(2)
+        local towers = FindTowersAtPosition(x, y, z)
+        UpgradeToLevel(towers, level)
+    end)
+end)
+
 -- Minimize
 MinimizeButton.MouseButton1Click:Connect(function()
     local isMinimized = not DropdownButton.Visible
     
     DropdownButton.Visible = not isMinimized
+    NameInput.Visible = not isMinimized
     CountInput.Visible = not isMinimized
+    LevelInput.Visible = not isMinimized
     StackButton.Visible = not isMinimized
+    UpgradeButton.Visible = not isMinimized
+    HybridButton.Visible = not isMinimized
     
     if isMinimized then
         MainFrame.Size = UDim2.new(0, 280, 0, 40)
         MinimizeButton.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 280, 0, 180)
+        MainFrame.Size = UDim2.new(0, 280, 0, 340)
         MinimizeButton.Text = "—"
     end
 end)
@@ -495,10 +620,17 @@ end)
 getgenv().Stacked = {
     Stack = StackDifferential,
     Place = PlaceTowerAt,
-    Upgrade = UpgradeTowerList,
+    Upgrade = UpgradeToLevel,
+    Hybrid = function(unit, count, level)
+        local x, y, z = GetPlayerPosition()
+        StackDifferential(unit or selectedUnit, x, y, z, count or CONFIG.StackCount)
+        task.wait(2)
+        local towers = FindTowersAtPosition(x, y, z)
+        UpgradeToLevel(towers, level or CONFIG.TargetLevel)
+    end,
 }
 
 print("=================================")
-print("📦 STACKED - REVISED")
-print("Auto register ke Tower Manager")
+print("📦 STACKED - SEARCH FIXED")
+print("Evo selalu muncul pas search")
 print("=================================")
