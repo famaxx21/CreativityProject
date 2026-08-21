@@ -1,6 +1,5 @@
 -- ==========================================
--- TOWER MANAGER - REVISED FINAL
--- Include RegisterTower + IsTracked
+-- TOWER MANAGER - BATCH MODE TOGGLE
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,6 +11,8 @@ local RemoteFunction = ReplicatedStorage:FindFirstChild("RemoteFunction")
 
 local towerList = {}
 local selectedTower = nil
+local selectedBatch = {}
+local batchMode = false  -- BATCH MODE ON/OFF
 
 -- ========== REGISTRY ==========
 local towerRegistry = {}
@@ -26,7 +27,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local args = {...}
     
     if method == "InvokeServer" and self.Name == "RemoteFunction" then
-        -- Place hook
         if args[1] == "Troops" and args[2] == "Place" then
             local placementData = args[3]
             local unitName = args[4]
@@ -45,7 +45,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             end
         end
         
-        -- Upgrade hook (track level)
         if args[1] == "Troops" and args[2] == "Upgrade" and args[3] == "Set" then
             local upgradeData = args[4]
             
@@ -62,7 +61,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             end
         end
         
-        -- Sell hook
         if args[1] == "Troops" and args[2] == "Sell" then
             local sellData = args[3]
             
@@ -89,6 +87,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     end
                     
                     towerLevels[soldTower] = nil
+                    selectedBatch[soldTower] = nil
                     
                     task.spawn(function()
                         task.wait(0.2)
@@ -168,6 +167,7 @@ local function CleanupDeletedTowers()
             
             towerRegistry[tower] = nil
             towerLevels[tower] = nil
+            selectedBatch[tower] = nil
         end
     end
     
@@ -306,6 +306,32 @@ local function UpgradeTower(tower, pathType)
     end)
 end
 
+local function UpgradeSelectedBatch(pathType)
+    local batchTowers = {}
+    
+    for tower, selected in pairs(selectedBatch) do
+        if selected and tower.Parent then
+            table.insert(batchTowers, tower)
+        end
+    end
+    
+    if #batchTowers == 0 then
+        print("[Batch] Nggak ada tower di-select")
+        return
+    end
+    
+    print(string.format("[Batch] Upgrading %d towers...", #batchTowers))
+    
+    for i, tower in ipairs(batchTowers) do
+        if tower.Parent then
+            UpgradeTower(tower, pathType)
+            task.wait(0.15)
+        end
+    end
+    
+    print("[Batch] Selesai")
+end
+
 -- ========== SELL ==========
 local function SellTower(tower)
     if not tower or not tower.Parent then return end
@@ -332,8 +358,6 @@ end
 local function SellAllTowers()
     local myTowers = FindAllMyTowers()
     
-    print(string.format("[Sell] Menjual %d towers...", #myTowers))
-    
     for i, tower in ipairs(myTowers) do
         if tower.Parent then
             pcall(function()
@@ -358,7 +382,7 @@ ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 280, 0, 380)
+MainFrame.Size = UDim2.new(0, 280, 0, 420)
 MainFrame.Position = UDim2.new(0, 10, 0, 50)
 MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
 MainFrame.BorderSizePixel = 0
@@ -419,15 +443,95 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 4)
 CloseCorner.Parent = CloseButton
 
+-- BATCH MODE TOGGLE
+local BatchModeButton = Instance.new("TextButton")
+BatchModeButton.Size = UDim2.new(1, -20, 0, 30)
+BatchModeButton.Position = UDim2.new(0, 10, 0, 45)
+BatchModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+BatchModeButton.BorderSizePixel = 0
+BatchModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BatchModeButton.Text = "🔘 BATCH MODE: OFF"
+BatchModeButton.Font = Enum.Font.GothamBold
+BatchModeButton.TextSize = 11
+BatchModeButton.Parent = MainFrame
+
+local BatchModeCorner = Instance.new("UICorner")
+BatchModeCorner.CornerRadius = UDim.new(0, 5)
+BatchModeCorner.Parent = BatchModeButton
+
+-- Batch action buttons (hidden until batch mode on)
+local BatchActionsFrame = Instance.new("Frame")
+BatchActionsFrame.Size = UDim2.new(1, -20, 0, 60)
+BatchActionsFrame.Position = UDim2.new(0, 10, 0, 80)
+BatchActionsFrame.BackgroundTransparency = 1
+BatchActionsFrame.Visible = false
+BatchActionsFrame.Parent = MainFrame
+
+local BatchUpgradeEButton = Instance.new("TextButton")
+BatchUpgradeEButton.Size = UDim2.new(0, 115, 0, 25)
+BatchUpgradeEButton.Position = UDim2.new(0, 0, 0, 0)
+BatchUpgradeEButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+BatchUpgradeEButton.BorderSizePixel = 0
+BatchUpgradeEButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BatchUpgradeEButton.Text = "⬆️ BATCH [E]"
+BatchUpgradeEButton.Font = Enum.Font.GothamBold
+BatchUpgradeEButton.TextSize = 9
+BatchUpgradeEButton.Parent = BatchActionsFrame
+
+local BatchUpgradeECorner = Instance.new("UICorner")
+BatchUpgradeECorner.CornerRadius = UDim.new(0, 4)
+BatchUpgradeECorner.Parent = BatchUpgradeEButton
+
+local BatchUpgradeZButton = Instance.new("TextButton")
+BatchUpgradeZButton.Size = UDim2.new(0, 115, 0, 25)
+BatchUpgradeZButton.Position = UDim2.new(0, 125, 0, 0)
+BatchUpgradeZButton.BackgroundColor3 = Color3.fromRGB(0, 100, 180)
+BatchUpgradeZButton.BorderSizePixel = 0
+BatchUpgradeZButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BatchUpgradeZButton.Text = "⬇️ BATCH [Z]"
+BatchUpgradeZButton.Font = Enum.Font.GothamBold
+BatchUpgradeZButton.TextSize = 9
+BatchUpgradeZButton.Parent = BatchActionsFrame
+
+local BatchUpgradeZCorner = Instance.new("UICorner")
+BatchUpgradeZCorner.CornerRadius = UDim.new(0, 4)
+BatchUpgradeZCorner.Parent = BatchUpgradeZButton
+
+local ClearBatchButton = Instance.new("TextButton")
+ClearBatchButton.Size = UDim2.new(0, 115, 0, 25)
+ClearBatchButton.Position = UDim2.new(0, 0, 0, 30)
+ClearBatchButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+ClearBatchButton.BorderSizePixel = 0
+ClearBatchButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClearBatchButton.Text = "CLEAR"
+ClearBatchButton.Font = Enum.Font.GothamBold
+ClearBatchButton.TextSize = 9
+ClearBatchButton.Parent = BatchActionsFrame
+
+local ClearBatchCorner = Instance.new("UICorner")
+ClearBatchCorner.CornerRadius = UDim.new(0, 4)
+ClearBatchCorner.Parent = ClearBatchButton
+
+local BatchCountLabel = Instance.new("TextLabel")
+BatchCountLabel.Size = UDim2.new(0, 115, 0, 25)
+BatchCountLabel.Position = UDim2.new(0, 125, 0, 30)
+BatchCountLabel.BackgroundTransparency = 1
+BatchCountLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
+BatchCountLabel.Text = "Selected: 0"
+BatchCountLabel.Font = Enum.Font.Gotham
+BatchCountLabel.TextSize = 10
+BatchCountLabel.TextXAlignment = Enum.TextXAlignment.Center
+BatchCountLabel.Parent = BatchActionsFrame
+
 local SellAllButton = Instance.new("TextButton")
-SellAllButton.Size = UDim2.new(1, -20, 0, 30)
-SellAllButton.Position = UDim2.new(0, 10, 0, 40)
+SellAllButton.Size = UDim2.new(1, -20, 0, 25)
+SellAllButton.Position = UDim2.new(0, 10, 0, 145)
 SellAllButton.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
 SellAllButton.BorderSizePixel = 0
 SellAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-SellAllButton.Text = "💰 SELL ALL TOWERS"
+SellAllButton.Text = "💰 SELL ALL"
 SellAllButton.Font = Enum.Font.GothamBold
-SellAllButton.TextSize = 11
+SellAllButton.TextSize = 10
 SellAllButton.Parent = MainFrame
 
 local SellAllCorner = Instance.new("UICorner")
@@ -435,8 +539,8 @@ SellAllCorner.CornerRadius = UDim.new(0, 5)
 SellAllCorner.Parent = SellAllButton
 
 local TowerScroll = Instance.new("ScrollingFrame")
-TowerScroll.Size = UDim2.new(1, 0, 1, -75)
-TowerScroll.Position = UDim2.new(0, 0, 0, 75)
+TowerScroll.Size = UDim2.new(1, 0, 1, -180)
+TowerScroll.Position = UDim2.new(0, 0, 0, 180)
 TowerScroll.BackgroundTransparency = 1
 TowerScroll.ScrollBarThickness = 4
 TowerScroll.ScrollBarImageColor3 = Color3.fromRGB(50, 50, 60)
@@ -453,6 +557,7 @@ TowerPadding.PaddingRight = UDim.new(0, 6)
 TowerPadding.PaddingTop = UDim.new(0, 6)
 TowerPadding.Parent = TowerScroll
 
+-- Upgrade panel
 local UpgradePanel = Instance.new("Frame")
 UpgradePanel.Size = UDim2.new(0, 230, 0, 280)
 UpgradePanel.Position = UDim2.new(0, 300, 0, 80)
@@ -545,6 +650,18 @@ SellTowerCorner.CornerRadius = UDim.new(0, 8)
 SellTowerCorner.Parent = SellTowerButton
 
 -- ========== FUNCTIONS ==========
+local function UpdateBatchCount()
+    local count = 0
+    
+    for tower, selected in pairs(selectedBatch) do
+        if selected and tower.Parent then
+            count = count + 1
+        end
+    end
+    
+    BatchCountLabel.Text = "Selected: " .. count
+end
+
 local function UpdatePanelInfo()
     if not selectedTower or not selectedTower.Parent then
         UpgradePanel.Visible = false
@@ -590,12 +707,15 @@ local function RefreshList()
                     costText = string.format("$%d", info.Cost)
                 end
                 
+                local isSelected = selectedBatch[tower] == true
+                
                 local towerButton = Instance.new("TextButton")
                 towerButton.Size = UDim2.new(1, -10, 0, 50)
-                towerButton.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+                towerButton.BackgroundColor3 = isSelected and Color3.fromRGB(0, 100, 60) or Color3.fromRGB(28, 28, 38)
                 towerButton.BorderSizePixel = 0
                 towerButton.TextColor3 = Color3.fromRGB(220, 220, 230)
-                towerButton.Text = string.format("%s\n💰 %s | 📍 %s | Lv.%s", 
+                towerButton.Text = string.format("%s%s\n💰 %s | 📍 %s | Lv.%s",
+                    isSelected and "✅ " or "",
                     info.DisplayName, costText, info.Position, info.Level)
                 towerButton.Font = Enum.Font.GothamBold
                 towerButton.TextSize = 8
@@ -606,15 +726,45 @@ local function RefreshList()
                 corner.Parent = towerButton
                 
                 towerButton.MouseButton1Click:Connect(function()
-                    selectedTower = tower
-                    UpdatePanelInfo()
+                    if batchMode then
+                        -- BATCH MODE: klik kiri = select/deselect
+                        selectedBatch[tower] = not selectedBatch[tower]
+                        UpdateBatchCount()
+                        RefreshList()
+                    else
+                        -- NORMAL MODE: klik kiri = info
+                        selectedTower = tower
+                        UpdatePanelInfo()
+                    end
                 end)
             end
         end
     end
+    
+    UpdateBatchCount()
 end
 
--- Callbacks
+-- ========== CALLBACKS ==========
+BatchModeButton.MouseButton1Click:Connect(function()
+    batchMode = not batchMode
+    
+    if batchMode then
+        BatchModeButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+        BatchModeButton.Text = "🔘 BATCH MODE: ON"
+        BatchActionsFrame.Visible = true
+        UpgradePanel.Visible = false
+        selectedTower = nil
+    else
+        BatchModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        BatchModeButton.Text = "🔘 BATCH MODE: OFF"
+        BatchActionsFrame.Visible = false
+        selectedBatch = {}
+        UpdateBatchCount()
+    end
+    
+    RefreshList()
+end)
+
 RefreshButton.MouseButton1Click:Connect(RefreshList)
 
 UpgradeEButton.MouseButton1Click:Connect(function()
@@ -637,6 +787,20 @@ end)
 
 SellAllButton.MouseButton1Click:Connect(function()
     SellAllTowers()
+end)
+
+BatchUpgradeEButton.MouseButton1Click:Connect(function()
+    UpgradeSelectedBatch("Top")
+end)
+
+BatchUpgradeZButton.MouseButton1Click:Connect(function()
+    UpgradeSelectedBatch("Bottom")
+end)
+
+ClearBatchButton.MouseButton1Click:Connect(function()
+    selectedBatch = {}
+    UpdateBatchCount()
+    RefreshList()
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
@@ -693,7 +857,6 @@ end)
 -- Initial
 RefreshList()
 
--- ========== EXPORT ==========
 getgenv().TowerManager = {
     Refresh = RefreshList,
     Select = function(tower)
@@ -708,12 +871,14 @@ getgenv().TowerManager = {
     end,
     Sell = SellTower,
     SellAll = SellAllTowers,
-    
-    -- REGISTER FUNCTIONS
+    UpgradeBatch = UpgradeSelectedBatch,
+    ToggleBatchMode = function()
+        batchMode = not batchMode
+        RefreshList()
+    end,
     IsTracked = function(tower)
         return towerRegistry[tower] ~= nil
     end,
-    
     RegisterTower = function(tower, unitName, x, z)
         if not tower or not tower.Parent then return end
         
@@ -748,6 +913,6 @@ getgenv().TowerManager = {
 }
 
 print("=================================")
-print("🏗️ TOWER MANAGER - REVISED")
-print("RegisterTower + IsTracked ready")
+print("🏗️ TOWER MANAGER - BATCH MODE")
+print("Klik BATCH MODE buat select tower")
 print("=================================")
