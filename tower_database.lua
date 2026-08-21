@@ -65,6 +65,7 @@ local TOWER_COST_DATABASE = {
     ["Toxic Gunner"] = 525,
     ["Swarmer"] = 900,
     ["Firework Technician"] = 1500,
+    ["Gladiator"] = 525,
 }
 
 local COST_TO_TOWER = {}
