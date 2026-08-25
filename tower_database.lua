@@ -57,6 +57,8 @@ local TOWER_COST_DATABASE = {
     ["Golden Scout"] = 250,
     ["Golden Soldier"] = 450,
     ["Golden Demoman"] = 875,
+    ["Golden Cowboy"] = 600,
+    ["Golden Snowballer"] = 67,
     
     -- Special
     ["Commando"] = 2150,
@@ -66,6 +68,21 @@ local TOWER_COST_DATABASE = {
     ["Swarmer"] = 900,
     ["Firework Technician"] = 1500,
     ["Gladiator"] = 525,
+    ["Slasher"] = 2400,
+    ["Sledger"] = 950,
+    ["Executioner"] = 750,
+    ["Elf Camp"] = 300,
+    ["Jester"] = 650,
+    ["Cryomancer"] = 250,
+    ["Hallow Punk"] = 500,
+    ["Harvester"] = 2000,
+    ["Snowballer"] = 300,
+    ["Elementalist"] = 2000,
+    ["Biologist"] = 750,
+    ["Warlock"] = 4200,
+    ["Spotlight Tech"] = 3225,
+    ["War Machine"] = 6750,
+    ["Mecha Base"] = 6000,
 }
 
 local COST_TO_TOWER = {}
