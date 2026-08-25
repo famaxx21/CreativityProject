@@ -35,7 +35,10 @@ local TOWER_NAMES = {
     "Golden Minigunner", "Golden Pyromancer", "Golden Crook Boss",
     "Golden Scout", "Golden Soldier", "Golden Demoman",
     "Commando", "Frost Blaster", "Archer", "Toxic Gunner", "Swarmer",
-    "Firework Technician", "EvolvedEnforcer","Gladiator",
+    "Firework Technician", "EvolvedEnforcer", "Gladiator", "Golden Cowboy", "Golden Snowballer",
+    "Slasher", "Sledger", "Executioner", "Elf Camp", "Jester", "Cryomancer",
+    "Hallow Punk", "Harvester", "Snowballer", "Elementalist", "Biologist",
+    "Warlock", "Spotlight Tech", "War Machine", "Mecha Base",
 }
 
 local selectedUnit = "EvolvedOperator"
