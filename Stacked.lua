@@ -1,5 +1,5 @@
 -- ==========================================
--- STACKED - FINAL + SCROLL FIX + DEFAULT 16
+-- STACKED - FINAL + AUTO EQUIP
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,7 +10,7 @@ local RemoteEvent = ReplicatedStorage:FindFirstChild("RemoteEvent")
 local RemoteFunction = ReplicatedStorage:FindFirstChild("RemoteFunction")
 
 local CONFIG = {
-    StackCount = 16,  -- Default 16
+    StackCount = 16,
     BaseSpacing = 0.3,
     MinSpacing = 0.05,
     DecayFactor = 0.8,
@@ -19,8 +19,9 @@ local CONFIG = {
     UpgradeDelay = 0.05,
     TowerDelay = 0.05,
     LevelDelay = 0.3,
-    TargetLevel = 1,  -- Default Level 1
+    TargetLevel = 1,
     CoordinateTolerance = 10,
+    AutoEquip = true,  -- Auto equip sebelum place
 }
 
 local TOWER_NAMES = {
@@ -55,7 +56,36 @@ local function GetPlayerPosition()
     return 0, 0, 0
 end
 
+-- ========== AUTO EQUIP ==========
+local function AutoEquip(unitName)
+    if not CONFIG.AutoEquip then return end
+    
+    pcall(function()
+        RemoteEvent:FireServer("Sandbox", "EquipTower", unitName)
+    end)
+    task.wait(0.1)
+    
+    pcall(function()
+        RemoteEvent:FireServer("Inventory", "Equip", "Tower", unitName)
+    end)
+    task.wait(0.1)
+    
+    pcall(function()
+        RemoteEvent:FireServer("PlayerManager", "SelectLoadout", unitName)
+    end)
+    task.wait(0.1)
+    
+    pcall(function()
+        RemoteEvent:FireServer("PlayerManager", "UserLoadout", unitName)
+    end)
+    task.wait(0.2)
+end
+
+-- ========== PLACE + REGISTER ==========
 local function PlaceTowerAt(unitName, x, y, z)
+    -- AUTO EQUIP DULU
+    AutoEquip(unitName)
+    
     local placementData = {
         Rotation = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
         Position = Vector3.new(x, y, z),
@@ -109,6 +139,7 @@ local function PlaceTowerAt(unitName, x, y, z)
     return success
 end
 
+-- ========== STACK ==========
 local function StackDifferential(unitName, x, y, z, count)
     count = count or CONFIG.StackCount
     
@@ -141,6 +172,7 @@ local function StackDifferential(unitName, x, y, z, count)
     return placed
 end
 
+-- ========== FIND TOWERS ==========
 local function FindTowersAtPosition(x, y, z, tolerance)
     tolerance = tolerance or CONFIG.CoordinateTolerance
     local towers = workspace:FindFirstChild("Towers")
@@ -176,6 +208,7 @@ local function FindTowersAtPosition(x, y, z, tolerance)
     return matched
 end
 
+-- ========== UPGRADE ==========
 local function UpgradeTowerFast(towerInstance)
     if not towerInstance or not towerInstance.Parent then return false end
     
@@ -345,7 +378,7 @@ CountInput.PlaceholderText = "Count"
 CountInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
 CountInput.Font = Enum.Font.GothamBold
 CountInput.TextSize = 12
-CountInput.Text = "16"  -- Default 16
+CountInput.Text = "16"
 CountInput.Parent = MainFrame
 
 local CountCorner = Instance.new("UICorner")
@@ -362,7 +395,7 @@ LevelInput.PlaceholderText = "Level (buat upgrade)"
 LevelInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
 LevelInput.Font = Enum.Font.GothamBold
 LevelInput.TextSize = 12
-LevelInput.Text = "1"  -- Default Level 1
+LevelInput.Text = "1"
 LevelInput.Parent = MainFrame
 
 local LevelCorner = Instance.new("UICorner")
@@ -414,7 +447,7 @@ local HybridCorner = Instance.new("UICorner")
 HybridCorner.CornerRadius = UDim.new(0, 6)
 HybridCorner.Parent = HybridButton
 
--- Side panel dengan scroll fix
+-- Side panel
 local SidePanel = Instance.new("Frame")
 SidePanel.Size = UDim2.new(0, 220, 0, 500)
 SidePanel.Position = UDim2.new(0, 310, 0, 300)
@@ -631,7 +664,6 @@ getgenv().Stacked = {
 }
 
 print("=================================")
-print("📦 STACKED - SCROLL FIXED")
-print("Default: 16 towers, Level 1")
-print("Semua tower termasuk 16 baru")
+print("📦 STACKED - AUTO EQUIP")
+print("Equip otomatis sebelum place")
 print("=================================")
