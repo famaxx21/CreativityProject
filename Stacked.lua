@@ -1,5 +1,5 @@
 -- ==========================================
--- STACKED - FINAL + AUTO EQUIP
+-- STACKED - FINAL + NO AUTO EQUIP
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,17 +11,16 @@ local RemoteFunction = ReplicatedStorage:FindFirstChild("RemoteFunction")
 
 local CONFIG = {
     StackCount = 16,
-    BaseSpacing = 0.3,
-    MinSpacing = 0.05,
+    BaseSpacing = 0.1,
+    MinSpacing = 0.02,
     DecayFactor = 0.8,
-    PlaceDelay = 0.08,
+    PlaceDelay = 0.1,
     SelectDelay = 0.1,
     UpgradeDelay = 0.05,
     TowerDelay = 0.05,
     LevelDelay = 0.3,
     TargetLevel = 1,
     CoordinateTolerance = 10,
-    AutoEquip = true,  -- Auto equip sebelum place
 }
 
 local TOWER_NAMES = {
@@ -56,79 +55,54 @@ local function GetPlayerPosition()
     return 0, 0, 0
 end
 
--- ========== AUTO EQUIP ==========
-local function AutoEquip(unitName)
-    if not CONFIG.AutoEquip then return end
-    
-    pcall(function()
-        RemoteEvent:FireServer("Sandbox", "EquipTower", unitName)
-    end)
-    task.wait(0.1)
-    
-    pcall(function()
-        RemoteEvent:FireServer("Inventory", "Equip", "Tower", unitName)
-    end)
-    task.wait(0.1)
-    
-    pcall(function()
-        RemoteEvent:FireServer("PlayerManager", "SelectLoadout", unitName)
-    end)
-    task.wait(0.1)
-    
-    pcall(function()
-        RemoteEvent:FireServer("PlayerManager", "UserLoadout", unitName)
-    end)
-    task.wait(0.2)
-end
-
 -- ========== PLACE + REGISTER ==========
 local function PlaceTowerAt(unitName, x, y, z)
-    -- AUTO EQUIP DULU
-    AutoEquip(unitName)
-    
     local placementData = {
         Rotation = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
         Position = Vector3.new(x, y, z),
     }
     
-    local success = pcall(function()
+    local success, result = pcall(function()
         return RemoteFunction:InvokeServer("Troops", "Place", placementData, unitName)
     end)
     
-    if success then
-        task.wait(0.3)
+    if result ~= "Default" and result ~= true then
+        print(string.format("[Place] ❌ %s", tostring(result)))
+        return false
+    end
+    
+    task.wait(0.3)
+    
+    if getgenv().TowerManager and getgenv().TowerManager.RegisterTower then
+        local towers = workspace:FindFirstChild("Towers")
         
-        if getgenv().TowerManager and getgenv().TowerManager.RegisterTower then
-            local towers = workspace:FindFirstChild("Towers")
-            
-            if towers then
-                for _, tower in ipairs(towers:GetChildren()) do
-                    if tower:IsA("Model") then
-                        local owner = tower:FindFirstChild("Owner")
-                        local isMine = false
+        if towers then
+            for _, tower in ipairs(towers:GetChildren()) do
+                if tower:IsA("Model") then
+                    local owner = tower:FindFirstChild("Owner")
+                    local isMine = false
+                    
+                    if owner and owner.Value == LocalPlayer.UserId then
+                        isMine = true
+                    elseif not owner then
+                        isMine = true
+                    end
+                    
+                    if isMine then
+                        local alreadyTracked = false
                         
-                        if owner and owner.Value == LocalPlayer.UserId then
-                            isMine = true
-                        elseif not owner then
-                            isMine = true
+                        if getgenv().TowerManager.IsTracked then
+                            alreadyTracked = getgenv().TowerManager.IsTracked(tower)
                         end
                         
-                        if isMine then
-                            local alreadyTracked = false
+                        if not alreadyTracked then
+                            getgenv().TowerManager.RegisterTower(tower, unitName, x, z)
                             
-                            if getgenv().TowerManager.IsTracked then
-                                alreadyTracked = getgenv().TowerManager.IsTracked(tower)
+                            if customName ~= "" and getgenv().TowerManager.SetCustomName then
+                                getgenv().TowerManager.SetCustomName(tower, customName)
                             end
                             
-                            if not alreadyTracked then
-                                getgenv().TowerManager.RegisterTower(tower, unitName, x, z)
-                                
-                                if customName ~= "" and getgenv().TowerManager.SetCustomName then
-                                    getgenv().TowerManager.SetCustomName(tower, customName)
-                                end
-                                
-                                break
-                            end
+                            break
                         end
                     end
                 end
@@ -136,7 +110,7 @@ local function PlaceTowerAt(unitName, x, y, z)
         end
     end
     
-    return success
+    return true
 end
 
 -- ========== STACK ==========
@@ -664,6 +638,6 @@ getgenv().Stacked = {
 }
 
 print("=================================")
-print("📦 STACKED - AUTO EQUIP")
-print("Equip otomatis sebelum place")
+print("📦 STACKED - NO AUTO EQUIP")
+print("Place langsung, tanpa equip")
 print("=================================")
