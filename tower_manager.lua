@@ -1,5 +1,5 @@
 -- ==========================================
--- TOWER MANAGER - GROUPED + PAGINATION
+-- TOWER MANAGER - GROUPED + PAGES + MINIMIZE + SELECT ALL
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,7 +19,6 @@ local currentPage = 1
 local groupsPerPage = 5
 local totalPages = 1
 
--- ========== REGISTRY ==========
 local towerRegistry = {}
 local pendingPlacements = {}
 local towerNameCounters = {}
@@ -60,7 +59,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     if not towerLevels[upgradedTower] then
                         towerLevels[upgradedTower] = 0
                     end
-                    
                     towerLevels[upgradedTower] = towerLevels[upgradedTower] + 1
                 end
             end
@@ -412,7 +410,7 @@ TitleLabel.Parent = Header
 
 local RefreshButton = Instance.new("TextButton")
 RefreshButton.Size = UDim2.new(0, 30, 0, 25)
-RefreshButton.Position = UDim2.new(1, -65, 0.5, -12)
+RefreshButton.Position = UDim2.new(1, -95, 0.5, -12)
 RefreshButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 RefreshButton.BorderSizePixel = 0
 RefreshButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -424,6 +422,22 @@ RefreshButton.Parent = Header
 local RefreshCorner = Instance.new("UICorner")
 RefreshCorner.CornerRadius = UDim.new(0, 4)
 RefreshCorner.Parent = RefreshButton
+
+-- MINIMIZE BUTTON
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Size = UDim2.new(0, 30, 0, 25)
+MinimizeButton.Position = UDim2.new(1, -65, 0.5, -12)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeButton.Text = "—"
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.TextSize = 14
+MinimizeButton.Parent = Header
+
+local MinimizeCorner = Instance.new("UICorner")
+MinimizeCorner.CornerRadius = UDim.new(0, 4)
+MinimizeCorner.Parent = MinimizeButton
 
 local CloseButton = Instance.new("TextButton")
 CloseButton.Size = UDim2.new(0, 30, 0, 25)
@@ -440,7 +454,7 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 4)
 CloseCorner.Parent = CloseButton
 
--- BATCH MODE
+-- Batch Mode
 local BatchModeButton = Instance.new("TextButton")
 BatchModeButton.Size = UDim2.new(1, -20, 0, 28)
 BatchModeButton.Position = UDim2.new(0, 10, 0, 45)
@@ -519,7 +533,7 @@ BatchCountLabel.TextSize = 9
 BatchCountLabel.TextXAlignment = Enum.TextXAlignment.Center
 BatchCountLabel.Parent = BatchActionsFrame
 
--- FILTER
+-- Filter
 local FilterButton = Instance.new("TextButton")
 FilterButton.Size = UDim2.new(1, -20, 0, 28)
 FilterButton.Position = UDim2.new(0, 10, 0, 135)
@@ -550,7 +564,6 @@ local SellAllCorner = Instance.new("UICorner")
 SellAllCorner.CornerRadius = UDim.new(0, 5)
 SellAllCorner.Parent = SellAllButton
 
--- Tower scroll
 local TowerScroll = Instance.new("ScrollingFrame")
 TowerScroll.Size = UDim2.new(1, 0, 1, -260)
 TowerScroll.Position = UDim2.new(0, 0, 0, 203)
@@ -758,7 +771,6 @@ local function RefreshList()
     local myTowers = FindAllMyTowers()
     towerList = myTowers
     
-    -- GROUP BY UNIT NAME
     local groups = {}
     local groupOrder = {}
     
@@ -782,7 +794,6 @@ local function RefreshList()
         end
     end
     
-    -- Filter groups
     local filteredGroups = {}
     
     for _, unitName in ipairs(groupOrder) do
@@ -791,7 +802,6 @@ local function RefreshList()
         end
     end
     
-    -- Pagination
     totalPages = math.max(1, math.ceil(#filteredGroups / groupsPerPage))
     
     if currentPage > totalPages then
@@ -828,6 +838,42 @@ local function RefreshList()
             collapsedGroups[unitName] = not collapsedGroups[unitName]
             RefreshList()
         end)
+        
+        -- SELECT ALL BUTTON (BATCH MODE ONLY)
+        if batchMode then
+            local selectAllBtn = Instance.new("TextButton")
+            selectAllBtn.Size = UDim2.new(0, 70, 0, 20)
+            selectAllBtn.Position = UDim2.new(1, -80, 5, 0)
+            selectAllBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 180)
+            selectAllBtn.BorderSizePixel = 0
+            selectAllBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            selectAllBtn.Text = "SELECT ALL"
+            selectAllBtn.Font = Enum.Font.GothamBold
+            selectAllBtn.TextSize = 8
+            selectAllBtn.Parent = groupHeader
+            
+            local selectAllCorner = Instance.new("UICorner")
+            selectAllCorner.CornerRadius = UDim.new(0, 4)
+            selectAllCorner.Parent = selectAllBtn
+            
+            selectAllBtn.MouseButton1Click:Connect(function()
+                local allSelected = true
+                
+                for _, towerData in ipairs(groupTowers) do
+                    if not selectedBatch[towerData.Tower] then
+                        allSelected = false
+                        break
+                    end
+                end
+                
+                for _, towerData in ipairs(groupTowers) do
+                    selectedBatch[towerData.Tower] = not allSelected
+                end
+                
+                UpdateBatchCount()
+                RefreshList()
+            end)
+        end
         
         if not isCollapsed then
             for _, towerData in ipairs(groupTowers) do
@@ -978,6 +1024,30 @@ CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
+-- MINIMIZE
+local isMinimized = false
+local originalSize = MainFrame.Size
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    
+    BatchModeButton.Visible = not isMinimized
+    BatchActionsFrame.Visible = batchMode and not isMinimized
+    FilterButton.Visible = not isMinimized
+    SellAllButton.Visible = not isMinimized
+    TowerScroll.Visible = not isMinimized
+    PageFrame.Visible = not isMinimized
+    UpgradePanel.Visible = false
+    
+    if isMinimized then
+        MainFrame.Size = UDim2.new(0, 280, 0, 40)
+        MinimizeButton.Text = "+"
+    else
+        MainFrame.Size = originalSize
+        MinimizeButton.Text = "—"
+    end
+end)
+
 -- Pagination
 PrevPageButton.MouseButton1Click:Connect(function()
     if currentPage > 1 then
@@ -1035,8 +1105,10 @@ end)
 task.spawn(function()
     while true do
         task.wait(2)
-        RefreshList()
-        UpdatePanelInfo()
+        if not isMinimized then
+            RefreshList()
+            UpdatePanelInfo()
+        end
     end
 end)
 
@@ -1071,7 +1143,6 @@ getgenv().TowerManager = {
         towerNameCounters[unitName] = towerNameCounters[unitName] + 1
         
         local count = towerNameCounters[unitName]
-        
         local displayName = unitName
         
         if count > 1 then
@@ -1095,6 +1166,6 @@ getgenv().TowerManager = {
 }
 
 print("=================================")
-print("🏗️ TOWER MANAGER - GROUPED + PAGES")
+print("🏗️ TOWER MANAGER - MINIMIZE + SELECT ALL")
 print("Collapsible groups + pagination")
 print("=================================")
