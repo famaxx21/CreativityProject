@@ -1,5 +1,5 @@
 -- ==========================================
--- STACKED - FINAL + SCROLL FIX
+-- STACKED - FINAL + SCROLL FIX + DEFAULT 16
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,7 +10,7 @@ local RemoteEvent = ReplicatedStorage:FindFirstChild("RemoteEvent")
 local RemoteFunction = ReplicatedStorage:FindFirstChild("RemoteFunction")
 
 local CONFIG = {
-    StackCount = 10,
+    StackCount = 16,  -- Default 16
     BaseSpacing = 0.3,
     MinSpacing = 0.05,
     DecayFactor = 0.8,
@@ -19,7 +19,7 @@ local CONFIG = {
     UpgradeDelay = 0.05,
     TowerDelay = 0.05,
     LevelDelay = 0.3,
-    TargetLevel = 3,
+    TargetLevel = 1,  -- Default Level 1
     CoordinateTolerance = 10,
 }
 
@@ -35,7 +35,8 @@ local TOWER_NAMES = {
     "Golden Minigunner", "Golden Pyromancer", "Golden Crook Boss",
     "Golden Scout", "Golden Soldier", "Golden Demoman",
     "Commando", "Frost Blaster", "Archer", "Toxic Gunner", "Swarmer",
-    "Firework Technician", "EvolvedEnforcer", "Gladiator", "Golden Cowboy", "Golden Snowballer",
+    "Firework Technician", "EvolvedEnforcer", "Gladiator",
+    "Golden Cowboy", "Golden Snowballer",
     "Slasher", "Sledger", "Executioner", "Elf Camp", "Jester", "Cryomancer",
     "Hallow Punk", "Harvester", "Snowballer", "Elementalist", "Biologist",
     "Warlock", "Spotlight Tech", "War Machine", "Mecha Base",
@@ -344,7 +345,7 @@ CountInput.PlaceholderText = "Count"
 CountInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
 CountInput.Font = Enum.Font.GothamBold
 CountInput.TextSize = 12
-CountInput.Text = "10"
+CountInput.Text = "16"  -- Default 16
 CountInput.Parent = MainFrame
 
 local CountCorner = Instance.new("UICorner")
@@ -361,7 +362,7 @@ LevelInput.PlaceholderText = "Level (buat upgrade)"
 LevelInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
 LevelInput.Font = Enum.Font.GothamBold
 LevelInput.TextSize = 12
-LevelInput.Text = "3"
+LevelInput.Text = "1"  -- Default Level 1
 LevelInput.Parent = MainFrame
 
 local LevelCorner = Instance.new("UICorner")
@@ -448,12 +449,9 @@ SideScroll.Position = UDim2.new(0, 0, 0, 50)
 SideScroll.BackgroundTransparency = 1
 SideScroll.ScrollBarThickness = 5
 SideScroll.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 70)
-
--- SCROLL FIX: Set CanvasSize dynamic
 SideScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 SideScroll.ScrollingDirection = Enum.ScrollingDirection.Y
 SideScroll.CanvasSize = UDim2.new(0, 0, 0, #TOWER_NAMES * 31 + 10)
-
 SideScroll.Parent = SidePanel
 
 local SideLayout = Instance.new("UIListLayout")
@@ -526,7 +524,7 @@ DropdownButton.MouseButton1Click:Connect(function()
 end)
 
 StackButton.MouseButton1Click:Connect(function()
-    local count = tonumber(CountInput.Text) or 10
+    local count = tonumber(CountInput.Text) or 16
     local x, y, z = GetPlayerPosition()
     
     task.spawn(function()
@@ -535,7 +533,7 @@ StackButton.MouseButton1Click:Connect(function()
 end)
 
 UpgradeButton.MouseButton1Click:Connect(function()
-    local level = tonumber(LevelInput.Text) or 3
+    local level = tonumber(LevelInput.Text) or 1
     local x, y, z = GetPlayerPosition()
     
     task.spawn(function()
@@ -545,8 +543,8 @@ UpgradeButton.MouseButton1Click:Connect(function()
 end)
 
 HybridButton.MouseButton1Click:Connect(function()
-    local count = tonumber(CountInput.Text) or 10
-    local level = tonumber(LevelInput.Text) or 3
+    local count = tonumber(CountInput.Text) or 16
+    local level = tonumber(LevelInput.Text) or 1
     local x, y, z = GetPlayerPosition()
     
     task.spawn(function()
@@ -634,5 +632,6 @@ getgenv().Stacked = {
 
 print("=================================")
 print("📦 STACKED - SCROLL FIXED")
-print("Semua 55 tower bisa di-scroll")
+print("Default: 16 towers, Level 1")
+print("Semua tower termasuk 16 baru")
 print("=================================")
