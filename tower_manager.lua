@@ -1,5 +1,5 @@
 -- ==========================================
--- TOWER MANAGER - GROUPED + PAGES + MINIMIZE + SELECT ALL
+-- TOWER MANAGER - BATCH HEAL + UNAPPLY + SELL FIX
 -- ==========================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,6 +23,18 @@ local towerRegistry = {}
 local pendingPlacements = {}
 local towerNameCounters = {}
 local towerLevels = {}
+
+-- ========== HEALER STATE ==========
+local healerTargets = {}
+local healerLinks = {}
+local healerMode = false
+local activeHealer = nil
+local healerListCache = {}
+
+-- ========== BATCH HEAL STATE ==========
+local batchHealMode = false
+local batchHealTargets = {}
+local healSlotCapacity = 5
 
 -- ========== HOOK ==========
 local oldNamecall
@@ -91,12 +103,68 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     
                     towerLevels[soldTower] = nil
                     selectedBatch[soldTower] = nil
+                    healerTargets[soldTower] = nil
+                    batchHealTargets[soldTower] = nil
+                    
+                    -- Hapus sold tower dari healerLinks (sebagai healer)
+                    if healerLinks[soldTower] then
+                        healerLinks[soldTower] = nil
+                    end
+                    
+                    -- Hapus sold tower dari semua target lists
+                    for healer, targets in pairs(healerLinks) do
+                        if targets[soldTower] then
+                            targets[soldTower] = nil
+                        end
+                    end
+                    
+                    -- Reset activeHealer kalau yang di-sell adalah activeHealer
+                    if activeHealer == soldTower then
+                        activeHealer = nil
+                        healerTargets = {}
+                        UpdateHealerStatus()
+                        RefreshHealerPanel()
+                    end
+                    
+                    -- Reset CurrentHealer kalau yang di-sell
+                    if getgenv().CurrentHealer == soldTower then
+                        getgenv().CurrentHealer = nil
+                    end
                     
                     task.spawn(function()
                         task.wait(0.2)
                         RefreshList()
+                        if healerMode then
+                            RefreshHealerPanel()
+                        end
                     end)
                 end
+            end
+        end
+        
+        -- HEALER LINK DETECTION
+        if args[1] == "Troops" and args[2] == "TowerServerEvent" and args[3] == "ToggleSelectedTower" then
+            local healer = args[4]
+            local target = args[5]
+            
+            if healer and target then
+                -- BLOCK SELF-TARGET
+                if healer == target then
+                    print("[Healer] ⛔ Self-target blocked")
+                    return oldNamecall(self, ...)
+                end
+                
+                getgenv().CurrentHealer = healer
+                getgenv().CurrentHealTarget = target
+                
+                if not healerLinks[healer] then
+                    healerLinks[healer] = {}
+                end
+                
+                healerLinks[healer][target] = not healerLinks[healer][target]
+                
+                print(string.format("[Healer] Link toggled: %s -> %s (active: %s)", 
+                    healer.Name, target.Name, tostring(healerLinks[healer][target])))
             end
         end
     end
@@ -171,7 +239,27 @@ local function CleanupDeletedTowers()
             towerRegistry[tower] = nil
             towerLevels[tower] = nil
             selectedBatch[tower] = nil
+            healerTargets[tower] = nil
+            batchHealTargets[tower] = nil
         end
+    end
+    
+    -- Cleanup healerLinks untuk tower yang sudah hilang
+    for healer, targets in pairs(healerLinks) do
+        if not currentTowers[healer] then
+            healerLinks[healer] = nil
+        else
+            for target, active in pairs(targets) do
+                if not currentTowers[target] then
+                    targets[target] = nil
+                end
+            end
+        end
+    end
+    
+    if not currentTowers[activeHealer] then
+        activeHealer = nil
+        healerTargets = {}
     end
     
     if selectedTower and not selectedTower.Parent then
@@ -274,6 +362,62 @@ local function GetTowerInfo(tower)
     return info
 end
 
+-- ========== FIND HEALERS ==========
+local function FindAllHealers()
+    local myTowers = FindAllMyTowers()
+    local healers = {}
+    
+    for _, tower in ipairs(myTowers) do
+        if tower.Parent then
+            local info = GetTowerInfo(tower)
+            
+            if info then
+                local un = info.UnitName:lower()
+                
+                if un:find("medic") or un:find("healer") or un:find("doctor") or un:find("support") then
+                    table.insert(healers, tower)
+                end
+            end
+        end
+    end
+    
+    if #healers == 0 and getgenv().CurrentHealer and getgenv().CurrentHealer.Parent then
+        table.insert(healers, getgenv().CurrentHealer)
+    end
+    
+    return healers
+end
+
+-- ========== CHECK HEAL LINK ==========
+local function IsHealLinked(tower)
+    for healer, targets in pairs(healerLinks) do
+        if targets[tower] then
+            return true
+        end
+    end
+    
+    return false
+end
+
+local function IsLinkedToHealer(healer, target)
+    return healerLinks[healer] and healerLinks[healer][target] == true
+end
+
+-- ========== COUNT HEALER LINKS ==========
+local function GetHealerLinkCount(healer)
+    if not healerLinks[healer] then return 0 end
+    
+    local count = 0
+    
+    for target, active in pairs(healerLinks[healer]) do
+        if active and target.Parent then
+            count = count + 1
+        end
+    end
+    
+    return count
+end
+
 -- ========== UPGRADE ==========
 local function UpgradeTower(tower, pathType)
     if not tower or not tower.Parent then return end
@@ -328,6 +472,182 @@ local function UpgradeSelectedBatch(pathType)
     end
 end
 
+-- ========== HEALER LINK APPLY (SINGLE HEALER) ==========
+local function ApplyHealerLinks()
+    if not activeHealer or not activeHealer.Parent then
+        print("[Healer] ❌ Pilih healer dulu")
+        return
+    end
+    
+    local targets = {}
+    
+    for tower, selected in pairs(healerTargets) do
+        if selected and tower.Parent and tower ~= activeHealer then
+            table.insert(targets, tower)
+        end
+    end
+    
+    if #targets == 0 then
+        print("[Healer] ❌ Nggak ada target di-select")
+        return
+    end
+    
+    print(string.format("[Healer] Linking %d towers ke %s...", #targets, activeHealer.Name))
+    
+    for _, target in ipairs(targets) do
+        if target ~= activeHealer then
+            pcall(function()
+                RemoteFunction:InvokeServer("Troops", "TowerServerEvent", "ToggleSelectedTower", activeHealer, target)
+            end)
+            
+            task.wait(0.15)
+        end
+    end
+    
+    print("[Healer] ✅ Selesai link")
+    
+    healerTargets = {}
+    UpdateHealerStatus()
+    RefreshList()
+end
+
+-- ========== BATCH HEAL APPLY ==========
+local function ApplyBatchHeal()
+    local healers = FindAllHealers()
+    
+    if #healers == 0 then
+        print("[BatchHeal] ❌ Nggak ada healer")
+        return
+    end
+    
+    local targets = {}
+    
+    for tower, selected in pairs(batchHealTargets) do
+        if selected and tower.Parent then
+            local isHealer = false
+            
+            for _, h in ipairs(healers) do
+                if h == tower then
+                    isHealer = true
+                    break
+                end
+            end
+            
+            if not isHealer then
+                table.insert(targets, tower)
+            end
+        end
+    end
+    
+    if #targets == 0 then
+        print("[BatchHeal] ❌ Nggak ada target di-select")
+        return
+    end
+    
+    print(string.format("[BatchHeal] Distributing %d healers ke %d targets...", #healers, #targets))
+    
+    local healerIndex = 1
+    local linkCount = 0
+    
+    for _, target in ipairs(targets) do
+        local assigned = false
+        
+        for attempt = 1, #healers do
+            local healer = healers[healerIndex]
+            
+            healerIndex = healerIndex + 1
+            if healerIndex > #healers then
+                healerIndex = 1
+            end
+            
+            if healer and healer.Parent and healer ~= target then
+                local currentLinks = GetHealerLinkCount(healer)
+                
+                -- Skip kalau sudah ter-link
+                if IsLinkedToHealer(healer, target) then
+                    assigned = true
+                    print(string.format("[BatchHeal] Skip (already linked): %s -> %s", healer.Name, target.Name))
+                    break
+                end
+                
+                if currentLinks < healSlotCapacity then
+                    pcall(function()
+                        RemoteFunction:InvokeServer("Troops", "TowerServerEvent", "ToggleSelectedTower", healer, target)
+                    end)
+                    
+                    linkCount = linkCount + 1
+                    assigned = true
+                    print(string.format("[BatchHeal] %s -> %s", healer.Name, target.Name))
+                    
+                    task.wait(0.1)
+                    break
+                end
+            end
+        end
+        
+        if not assigned then
+            print(string.format("[BatchHeal] ⚠️ Nggak ada slot buat %s", target.Name))
+        end
+    end
+    
+    print(string.format("[BatchHeal] ✅ Selesai. %d link dibuat", linkCount))
+    
+    batchHealTargets = {}
+    UpdateBatchHealCount()
+    RefreshList()
+end
+
+-- ========== BATCH HEAL UNAPPLY ==========
+local function UnapplyBatchHeal()
+    local healers = FindAllHealers()
+    
+    if #healers == 0 then
+        print("[BatchHeal] ❌ Nggak ada healer")
+        return
+    end
+    
+    local targets = {}
+    
+    for tower, selected in pairs(batchHealTargets) do
+        if selected and tower.Parent then
+            table.insert(targets, tower)
+        end
+    end
+    
+    if #targets == 0 then
+        print("[BatchHeal] ❌ Nggak ada target di-select")
+        return
+    end
+    
+    print(string.format("[BatchHeal] Unlinking %d targets dari %d healers...", #targets, #healers))
+    
+    local unlinkCount = 0
+    
+    for _, healer in ipairs(healers) do
+        if healer.Parent then
+            for _, target in ipairs(targets) do
+                if target.Parent and IsLinkedToHealer(healer, target) then
+                    pcall(function()
+                        RemoteFunction:InvokeServer("Troops", "TowerServerEvent", "ToggleSelectedTower", healer, target)
+                    end)
+                    
+                    unlinkCount = unlinkCount + 1
+                    print(string.format("[BatchHeal] Unlink: %s -> %s", healer.Name, target.Name))
+                    
+                    task.wait(0.1)
+                end
+            end
+        end
+    end
+    
+    print(string.format("[BatchHeal] ✅ Selesai. %d link dihapus", unlinkCount))
+    
+    batchHealTargets = {}
+    UpdateBatchHealCount()
+    RefreshList()
+end
+
+-- ========== SELL ==========
 local function SellTower(tower)
     if not tower or not tower.Parent then return end
     
@@ -370,14 +690,14 @@ local function SellAllTowers()
     UpgradePanel.Visible = false
 end
 
--- ========== UI ==========
+-- ========== MAIN UI ==========
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TowerManagerUI"
 ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 280, 0, 450)
+MainFrame.Size = UDim2.new(0, 280, 0, 520)
 MainFrame.Position = UDim2.new(0, 10, 0, 30)
 MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
 MainFrame.BorderSizePixel = 0
@@ -423,7 +743,6 @@ local RefreshCorner = Instance.new("UICorner")
 RefreshCorner.CornerRadius = UDim.new(0, 4)
 RefreshCorner.Parent = RefreshButton
 
--- MINIMIZE BUTTON
 local MinimizeButton = Instance.new("TextButton")
 MinimizeButton.Size = UDim2.new(0, 30, 0, 25)
 MinimizeButton.Position = UDim2.new(1, -65, 0.5, -12)
@@ -454,7 +773,7 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 4)
 CloseCorner.Parent = CloseButton
 
--- Batch Mode
+-- BATCH MODE
 local BatchModeButton = Instance.new("TextButton")
 BatchModeButton.Size = UDim2.new(1, -20, 0, 28)
 BatchModeButton.Position = UDim2.new(0, 10, 0, 45)
@@ -470,9 +789,42 @@ local BatchModeCorner = Instance.new("UICorner")
 BatchModeCorner.CornerRadius = UDim.new(0, 5)
 BatchModeCorner.Parent = BatchModeButton
 
+-- HEALER MODE
+local HealerModeButton = Instance.new("TextButton")
+HealerModeButton.Size = UDim2.new(1, -20, 0, 28)
+HealerModeButton.Position = UDim2.new(0, 10, 0, 78)
+HealerModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+HealerModeButton.BorderSizePixel = 0
+HealerModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+HealerModeButton.Text = "💚 HEALER MODE: OFF"
+HealerModeButton.Font = Enum.Font.GothamBold
+HealerModeButton.TextSize = 10
+HealerModeButton.Parent = MainFrame
+
+local HealerModeCorner = Instance.new("UICorner")
+HealerModeCorner.CornerRadius = UDim.new(0, 5)
+HealerModeCorner.Parent = HealerModeButton
+
+-- BATCH HEAL MODE
+local BatchHealModeButton = Instance.new("TextButton")
+BatchHealModeButton.Size = UDim2.new(1, -20, 0, 28)
+BatchHealModeButton.Position = UDim2.new(0, 10, 0, 111)
+BatchHealModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+BatchHealModeButton.BorderSizePixel = 0
+BatchHealModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BatchHealModeButton.Text = "💚🔄 BATCH HEAL: OFF"
+BatchHealModeButton.Font = Enum.Font.GothamBold
+BatchHealModeButton.TextSize = 10
+BatchHealModeButton.Parent = MainFrame
+
+local BatchHealModeCorner = Instance.new("UICorner")
+BatchHealModeCorner.CornerRadius = UDim.new(0, 5)
+BatchHealModeCorner.Parent = BatchHealModeButton
+
+-- BATCH UPGRADE ACTIONS
 local BatchActionsFrame = Instance.new("Frame")
 BatchActionsFrame.Size = UDim2.new(1, -20, 0, 50)
-BatchActionsFrame.Position = UDim2.new(0, 10, 0, 78)
+BatchActionsFrame.Position = UDim2.new(0, 10, 0, 144)
 BatchActionsFrame.BackgroundTransparency = 1
 BatchActionsFrame.Visible = false
 BatchActionsFrame.Parent = MainFrame
@@ -533,10 +885,74 @@ BatchCountLabel.TextSize = 9
 BatchCountLabel.TextXAlignment = Enum.TextXAlignment.Center
 BatchCountLabel.Parent = BatchActionsFrame
 
+-- BATCH HEAL ACTIONS
+local BatchHealActionsFrame = Instance.new("Frame")
+BatchHealActionsFrame.Size = UDim2.new(1, -20, 0, 75)
+BatchHealActionsFrame.Position = UDim2.new(0, 10, 0, 144)
+BatchHealActionsFrame.BackgroundTransparency = 1
+BatchHealActionsFrame.Visible = false
+BatchHealActionsFrame.Parent = MainFrame
+
+local BatchHealApplyBtn = Instance.new("TextButton")
+BatchHealApplyBtn.Size = UDim2.new(0, 110, 0, 22)
+BatchHealApplyBtn.Position = UDim2.new(0, 0, 0, 0)
+BatchHealApplyBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 100)
+BatchHealApplyBtn.BorderSizePixel = 0
+BatchHealApplyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+BatchHealApplyBtn.Text = "💚 APPLY MEDIC"
+BatchHealApplyBtn.Font = Enum.Font.GothamBold
+BatchHealApplyBtn.TextSize = 9
+BatchHealApplyBtn.Parent = BatchHealActionsFrame
+
+local BatchHealApplyCorner = Instance.new("UICorner")
+BatchHealApplyCorner.CornerRadius = UDim.new(0, 4)
+BatchHealApplyCorner.Parent = BatchHealApplyBtn
+
+local BatchHealUnapplyBtn = Instance.new("TextButton")
+BatchHealUnapplyBtn.Size = UDim2.new(0, 110, 0, 22)
+BatchHealUnapplyBtn.Position = UDim2.new(0, 120, 0, 0)
+BatchHealUnapplyBtn.BackgroundColor3 = Color3.fromRGB(150, 60, 40)
+BatchHealUnapplyBtn.BorderSizePixel = 0
+BatchHealUnapplyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+BatchHealUnapplyBtn.Text = "💔 UNAPPLY"
+BatchHealUnapplyBtn.Font = Enum.Font.GothamBold
+BatchHealUnapplyBtn.TextSize = 9
+BatchHealUnapplyBtn.Parent = BatchHealActionsFrame
+
+local BatchHealUnapplyCorner = Instance.new("UICorner")
+BatchHealUnapplyCorner.CornerRadius = UDim.new(0, 4)
+BatchHealUnapplyCorner.Parent = BatchHealUnapplyBtn
+
+local ClearBatchHealButton = Instance.new("TextButton")
+ClearBatchHealButton.Size = UDim2.new(1, 0, 0, 22)
+ClearBatchHealButton.Position = UDim2.new(0, 0, 0, 25)
+ClearBatchHealButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+ClearBatchHealButton.BorderSizePixel = 0
+ClearBatchHealButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClearBatchHealButton.Text = "CLEAR"
+ClearBatchHealButton.Font = Enum.Font.GothamBold
+ClearBatchHealButton.TextSize = 9
+ClearBatchHealButton.Parent = BatchHealActionsFrame
+
+local ClearBatchHealCorner = Instance.new("UICorner")
+ClearBatchHealCorner.CornerRadius = UDim.new(0, 4)
+ClearBatchHealCorner.Parent = ClearBatchHealButton
+
+local BatchHealCountLabel = Instance.new("TextLabel")
+BatchHealCountLabel.Size = UDim2.new(1, 0, 0, 22)
+BatchHealCountLabel.Position = UDim2.new(0, 0, 0, 50)
+BatchHealCountLabel.BackgroundTransparency = 1
+BatchHealCountLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
+BatchHealCountLabel.Text = "Targets: 0"
+BatchHealCountLabel.Font = Enum.Font.Gotham
+BatchHealCountLabel.TextSize = 9
+BatchHealCountLabel.TextXAlignment = Enum.TextXAlignment.Center
+BatchHealCountLabel.Parent = BatchHealActionsFrame
+
 -- Filter
 local FilterButton = Instance.new("TextButton")
 FilterButton.Size = UDim2.new(1, -20, 0, 28)
-FilterButton.Position = UDim2.new(0, 10, 0, 135)
+FilterButton.Position = UDim2.new(0, 10, 0, 224)
 FilterButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 FilterButton.BorderSizePixel = 0
 FilterButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -551,7 +967,7 @@ FilterCorner.Parent = FilterButton
 
 local SellAllButton = Instance.new("TextButton")
 SellAllButton.Size = UDim2.new(1, -20, 0, 25)
-SellAllButton.Position = UDim2.new(0, 10, 0, 168)
+SellAllButton.Position = UDim2.new(0, 10, 0, 257)
 SellAllButton.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
 SellAllButton.BorderSizePixel = 0
 SellAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -565,8 +981,8 @@ SellAllCorner.CornerRadius = UDim.new(0, 5)
 SellAllCorner.Parent = SellAllButton
 
 local TowerScroll = Instance.new("ScrollingFrame")
-TowerScroll.Size = UDim2.new(1, 0, 1, -260)
-TowerScroll.Position = UDim2.new(0, 0, 0, 203)
+TowerScroll.Size = UDim2.new(1, 0, 1, -345)
+TowerScroll.Position = UDim2.new(0, 0, 0, 291)
 TowerScroll.BackgroundTransparency = 1
 TowerScroll.ScrollBarThickness = 4
 TowerScroll.ScrollBarImageColor3 = Color3.fromRGB(50, 50, 60)
@@ -587,7 +1003,7 @@ TowerPadding.Parent = TowerScroll
 -- Pagination
 local PageFrame = Instance.new("Frame")
 PageFrame.Size = UDim2.new(1, -20, 0, 30)
-PageFrame.Position = UDim2.new(0, 10, 0, 415)
+PageFrame.Position = UDim2.new(0, 10, 0, 485)
 PageFrame.BackgroundTransparency = 1
 PageFrame.Parent = MainFrame
 
@@ -724,6 +1140,96 @@ local SellTowerCorner = Instance.new("UICorner")
 SellTowerCorner.CornerRadius = UDim.new(0, 8)
 SellTowerCorner.Parent = SellTowerButton
 
+-- ========== HEALER PANEL (SEPARATE UI) ==========
+local HealerPanel = Instance.new("Frame")
+HealerPanel.Name = "HealerPanel"
+HealerPanel.Size = UDim2.new(0, 240, 0, 300)
+HealerPanel.Position = UDim2.new(0, 300, 0, 80)
+HealerPanel.BackgroundColor3 = Color3.fromRGB(16, 16, 24)
+HealerPanel.BorderSizePixel = 0
+HealerPanel.Visible = false
+HealerPanel.Parent = ScreenGui
+
+local HealerPanelCorner = Instance.new("UICorner")
+HealerPanelCorner.CornerRadius = UDim.new(0, 10)
+HealerPanelCorner.Parent = HealerPanel
+
+local HealerPanelHeader = Instance.new("Frame")
+HealerPanelHeader.Size = UDim2.new(1, 0, 0, 35)
+HealerPanelHeader.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+HealerPanelHeader.BorderSizePixel = 0
+HealerPanelHeader.Parent = HealerPanel
+
+local HealerPanelHeaderCorner = Instance.new("UICorner")
+HealerPanelHeaderCorner.CornerRadius = UDim.new(0, 10)
+HealerPanelHeaderCorner.Parent = HealerPanelHeader
+
+local HealerPanelTitle = Instance.new("TextLabel")
+HealerPanelTitle.Size = UDim2.new(1, -20, 0, 35)
+HealerPanelTitle.Position = UDim2.new(0, 10, 0, 0)
+HealerPanelTitle.BackgroundTransparency = 1
+HealerPanelTitle.TextColor3 = Color3.fromRGB(0, 255, 150)
+HealerPanelTitle.Text = "💚 PICK HEALER"
+HealerPanelTitle.Font = Enum.Font.GothamBlack
+HealerPanelTitle.TextSize = 12
+HealerPanelTitle.TextXAlignment = Enum.TextXAlignment.Left
+HealerPanelTitle.Parent = HealerPanelHeader
+
+local HealerPanelClose = Instance.new("TextButton")
+HealerPanelClose.Size = UDim2.new(0, 30, 0, 25)
+HealerPanelClose.Position = UDim2.new(1, -32, 0.5, -12)
+HealerPanelClose.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
+HealerPanelClose.BorderSizePixel = 0
+HealerPanelClose.TextColor3 = Color3.fromRGB(255, 255, 255)
+HealerPanelClose.Text = "×"
+HealerPanelClose.Font = Enum.Font.GothamBold
+HealerPanelClose.TextSize = 14
+HealerPanelClose.Parent = HealerPanelHeader
+
+local HealerPanelCloseCorner = Instance.new("UICorner")
+HealerPanelCloseCorner.CornerRadius = UDim.new(0, 4)
+HealerPanelCloseCorner.Parent = HealerPanelClose
+
+local HealerStatusLabel = Instance.new("TextLabel")
+HealerStatusLabel.Size = UDim2.new(1, -20, 0, 20)
+HealerStatusLabel.Position = UDim2.new(0, 10, 0, 40)
+HealerStatusLabel.BackgroundTransparency = 1
+HealerStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+HealerStatusLabel.Text = "Active: None"
+HealerStatusLabel.Font = Enum.Font.Gotham
+HealerStatusLabel.TextSize = 10
+HealerStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+HealerStatusLabel.Parent = HealerPanel
+
+local HealerScroll = Instance.new("ScrollingFrame")
+HealerScroll.Size = UDim2.new(1, -20, 0, 180)
+HealerScroll.Position = UDim2.new(0, 10, 0, 62)
+HealerScroll.BackgroundTransparency = 1
+HealerScroll.ScrollBarThickness = 3
+HealerScroll.ScrollBarImageColor3 = Color3.fromRGB(50, 50, 60)
+HealerScroll.CanvasSize = UDim2.new(0, 0, 0, 400)
+HealerScroll.Parent = HealerPanel
+
+local HealerLayout = Instance.new("UIListLayout")
+HealerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+HealerLayout.Padding = UDim.new(0, 4)
+HealerLayout.Parent = HealerScroll
+
+local ApplyHealerBtn = Instance.new("TextButton")
+ApplyHealerBtn.Size = UDim2.new(1, -20, 0, 28)
+ApplyHealerBtn.Position = UDim2.new(0, 10, 0, 252)
+ApplyHealerBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 100)
+ApplyHealerBtn.BorderSizePixel = 0
+ApplyHealerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ApplyHealerBtn.Text = "💚 APPLY LINK"
+ApplyHealerBtn.Font = Enum.Font.GothamBold
+ApplyHealerBtn.TextSize = 10
+ApplyHealerBtn.Parent = HealerPanel
+
+local ApplyHealerCorner = Instance.new("UICorner")
+ApplyHealerCorner.CornerRadius = UDim.new(0, 5)
+ApplyHealerCorner.Parent = ApplyHealerBtn
+
 -- ========== FUNCTIONS ==========
 local function UpdateBatchCount()
     local count = 0
@@ -737,6 +1243,94 @@ local function UpdateBatchCount()
     BatchCountLabel.Text = "Selected: " .. count
 end
 
+local function UpdateBatchHealCount()
+    local count = 0
+    
+    for tower, selected in pairs(batchHealTargets) do
+        if selected and tower.Parent then
+            count = count + 1
+        end
+    end
+    
+    local healerCount = #FindAllHealers()
+    BatchHealCountLabel.Text = string.format("Targets: %d | Healers: %d", count, healerCount)
+end
+
+local function UpdateHealerStatus()
+    if activeHealer and activeHealer.Parent then
+        local info = GetTowerInfo(activeHealer)
+        local targetCount = 0
+        
+        for tower, selected in pairs(healerTargets) do
+            if selected and tower.Parent then
+                targetCount = targetCount + 1
+            end
+        end
+        
+        HealerStatusLabel.Text = string.format("Active: %s | Targets: %d", 
+            info and info.DisplayName or activeHealer.Name, targetCount)
+    else
+        HealerStatusLabel.Text = "Active: None"
+    end
+end
+
+local function RefreshHealerPanel()
+    for _, child in ipairs(HealerScroll:GetChildren()) do
+        if child:IsA("TextButton") or child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+    
+    local healers = FindAllHealers()
+    healerListCache = healers
+    
+    if #healers == 0 then
+        local emptyLabel = Instance.new("TextLabel")
+        emptyLabel.Size = UDim2.new(1, 0, 0, 30)
+        emptyLabel.BackgroundTransparency = 1
+        emptyLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
+        emptyLabel.Text = "No healer found"
+        emptyLabel.Font = Enum.Font.Gotham
+        emptyLabel.TextSize = 10
+        emptyLabel.Parent = HealerScroll
+        return
+    end
+    
+    for _, healer in ipairs(healers) do
+        local info = GetTowerInfo(healer)
+        local isActive = activeHealer == healer
+        local linkCount = GetHealerLinkCount(healer)
+        
+        local healerBtn = Instance.new("TextButton")
+        healerBtn.Size = UDim2.new(1, 0, 0, 35)
+        healerBtn.BackgroundColor3 = isActive and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(24, 24, 34)
+        healerBtn.BorderSizePixel = 0
+        healerBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
+        healerBtn.Text = string.format("%s %s | Lv.%s | %d/%d",
+            isActive and "✅" or "",
+            info and info.DisplayName or healer.Name,
+            info and info.Level or "?",
+            linkCount,
+            healSlotCapacity)
+        healerBtn.Font = Enum.Font.GothamBold
+        healerBtn.TextSize = 9
+        healerBtn.Parent = HealerScroll
+        
+        local healerCorner = Instance.new("UICorner")
+        healerCorner.CornerRadius = UDim.new(0, 4)
+        healerCorner.Parent = healerBtn
+        
+        healerBtn.MouseButton1Click:Connect(function()
+            activeHealer = healer
+            healerTargets = {}
+            getgenv().CurrentHealer = healer
+            UpdateHealerStatus()
+            RefreshHealerPanel()
+            RefreshList()
+        end)
+    end
+end
+
 local function UpdatePanelInfo()
     if not selectedTower or not selectedTower.Parent then
         UpgradePanel.Visible = false
@@ -747,12 +1341,15 @@ local function UpdatePanelInfo()
     local info = GetTowerInfo(selectedTower)
     
     if info then
+        local healStatus = IsHealLinked(selectedTower) and "💚 HEALED" or "NO HEAL"
+        
         InfoLabel.Text = string.format(
-            "🏷️ %s\n💰 Cost: $%d\n📍 %s\n⚡ Level: %s",
+            "🏷️ %s\n💰 Cost: $%d\n📍 %s\n⚡ Level: %s\n%s",
             info.DisplayName,
             info.Cost,
             info.Position,
-            info.Level
+            info.Level,
+            healStatus
         )
         
         UpgradePanel.Visible = true
@@ -818,38 +1415,44 @@ local function RefreshList()
         local groupTowers = groups[unitName]
         local isCollapsed = collapsedGroups[unitName] == true
         
-        local groupHeader = Instance.new("TextButton")
+        local groupHeader = Instance.new("Frame")
         groupHeader.Size = UDim2.new(1, -10, 0, 30)
         groupHeader.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
         groupHeader.BorderSizePixel = 0
-        groupHeader.TextColor3 = Color3.fromRGB(255, 200, 0)
-        groupHeader.Text = string.format("%s %s (%d)", 
-            isCollapsed and "▶" or "▼", unitName, #groupTowers)
-        groupHeader.Font = Enum.Font.GothamBold
-        groupHeader.TextSize = 11
-        groupHeader.TextXAlignment = Enum.TextXAlignment.Left
         groupHeader.Parent = TowerScroll
         
         local groupCorner = Instance.new("UICorner")
         groupCorner.CornerRadius = UDim.new(0, 5)
         groupCorner.Parent = groupHeader
         
-        groupHeader.MouseButton1Click:Connect(function()
+        local groupLabel = Instance.new("TextButton")
+        groupLabel.Size = UDim2.new(1, 0, 1, 0)
+        groupLabel.BackgroundTransparency = 1
+        groupLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+        groupLabel.Text = string.format("%s %s (%d)", 
+            isCollapsed and "▶" or "▼", unitName, #groupTowers)
+        groupLabel.Font = Enum.Font.GothamBold
+        groupLabel.TextSize = 11
+        groupLabel.TextXAlignment = Enum.TextXAlignment.Left
+        groupLabel.Parent = groupHeader
+        
+        groupLabel.MouseButton1Click:Connect(function()
             collapsedGroups[unitName] = not collapsedGroups[unitName]
             RefreshList()
         end)
         
-        -- SELECT ALL BUTTON (BATCH MODE ONLY)
-        if batchMode then
+        -- SELECT ALL BUTTON - batch mode atau batch heal mode
+        if batchMode or batchHealMode then
             local selectAllBtn = Instance.new("TextButton")
             selectAllBtn.Size = UDim2.new(0, 70, 0, 20)
-            selectAllBtn.Position = UDim2.new(1, -80, 5, 0)
-            selectAllBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 180)
+            selectAllBtn.Position = UDim2.new(1, -80, 0.5, -10)
+            selectAllBtn.BackgroundColor3 = batchHealMode and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(0, 120, 180)
             selectAllBtn.BorderSizePixel = 0
             selectAllBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             selectAllBtn.Text = "SELECT ALL"
             selectAllBtn.Font = Enum.Font.GothamBold
             selectAllBtn.TextSize = 8
+            selectAllBtn.ZIndex = 2
             selectAllBtn.Parent = groupHeader
             
             local selectAllCorner = Instance.new("UICorner")
@@ -857,21 +1460,39 @@ local function RefreshList()
             selectAllCorner.Parent = selectAllBtn
             
             selectAllBtn.MouseButton1Click:Connect(function()
-                local allSelected = true
-                
-                for _, towerData in ipairs(groupTowers) do
-                    if not selectedBatch[towerData.Tower] then
-                        allSelected = false
-                        break
+                if batchHealMode then
+                    local allSelected = true
+                    
+                    for _, towerData in ipairs(groupTowers) do
+                        if not batchHealTargets[towerData.Tower] then
+                            allSelected = false
+                            break
+                        end
                     end
+                    
+                    for _, towerData in ipairs(groupTowers) do
+                        batchHealTargets[towerData.Tower] = not allSelected
+                    end
+                    
+                    UpdateBatchHealCount()
+                    RefreshList()
+                elseif batchMode then
+                    local allSelected = true
+                    
+                    for _, towerData in ipairs(groupTowers) do
+                        if not selectedBatch[towerData.Tower] then
+                            allSelected = false
+                            break
+                        end
+                    end
+                    
+                    for _, towerData in ipairs(groupTowers) do
+                        selectedBatch[towerData.Tower] = not allSelected
+                    end
+                    
+                    UpdateBatchCount()
+                    RefreshList()
                 end
-                
-                for _, towerData in ipairs(groupTowers) do
-                    selectedBatch[towerData.Tower] = not allSelected
-                end
-                
-                UpdateBatchCount()
-                RefreshList()
             end)
         end
         
@@ -880,14 +1501,23 @@ local function RefreshList()
                 local tower = towerData.Tower
                 local info = towerData.Info
                 local isSelected = selectedBatch[tower] == true
+                local isHealerTarget = healerTargets[tower] == true
+                local isBatchHealTarget = batchHealTargets[tower] == true
+                local isHealed = IsHealLinked(tower)
                 
                 local towerButton = Instance.new("TextButton")
                 towerButton.Size = UDim2.new(1, -20, 0, 45)
-                towerButton.BackgroundColor3 = isSelected and Color3.fromRGB(0, 100, 60) or Color3.fromRGB(24, 24, 34)
+                towerButton.BackgroundColor3 = isSelected and Color3.fromRGB(0, 100, 60) or 
+                                               isHealerTarget and Color3.fromRGB(0, 80, 50) or
+                                               isBatchHealTarget and Color3.fromRGB(0, 60, 80) or
+                                               Color3.fromRGB(24, 24, 34)
                 towerButton.BorderSizePixel = 0
                 towerButton.TextColor3 = Color3.fromRGB(200, 200, 210)
-                towerButton.Text = string.format("%sLv.%s | %s",
+                towerButton.Text = string.format("%s%s%s%sLv.%s | %s",
+                    isHealed and "💚 " or "",
                     isSelected and "✅ " or "",
+                    isHealerTarget and "🎯 " or "",
+                    isBatchHealTarget and "🔵 " or "",
                     info.Level,
                     info.Position)
                 towerButton.Font = Enum.Font.GothamBold
@@ -899,9 +1529,17 @@ local function RefreshList()
                 towerCorner.Parent = towerButton
                 
                 towerButton.MouseButton1Click:Connect(function()
-                    if batchMode then
+                    if batchHealMode then
+                        batchHealTargets[tower] = not batchHealTargets[tower]
+                        UpdateBatchHealCount()
+                        RefreshList()
+                    elseif batchMode then
                         selectedBatch[tower] = not selectedBatch[tower]
                         UpdateBatchCount()
+                        RefreshList()
+                    elseif healerMode and activeHealer then
+                        healerTargets[tower] = not healerTargets[tower]
+                        UpdateHealerStatus()
                         RefreshList()
                     else
                         selectedTower = tower
@@ -913,6 +1551,8 @@ local function RefreshList()
     end
     
     UpdateBatchCount()
+    UpdateBatchHealCount()
+    UpdateHealerStatus()
 end
 
 -- Filter options
@@ -964,11 +1604,19 @@ end)
 
 BatchModeButton.MouseButton1Click:Connect(function()
     batchMode = not batchMode
+    healerMode = false
+    batchHealMode = false
+    HealerPanel.Visible = false
     
     if batchMode then
         BatchModeButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
         BatchModeButton.Text = "🔘 BATCH MODE: ON"
         BatchActionsFrame.Visible = true
+        BatchHealActionsFrame.Visible = false
+        HealerModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        HealerModeButton.Text = "💚 HEALER MODE: OFF"
+        BatchHealModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        BatchHealModeButton.Text = "💚🔄 BATCH HEAL: OFF"
         UpgradePanel.Visible = false
         selectedTower = nil
     else
@@ -982,7 +1630,82 @@ BatchModeButton.MouseButton1Click:Connect(function()
     RefreshList()
 end)
 
-RefreshButton.MouseButton1Click:Connect(RefreshList)
+HealerModeButton.MouseButton1Click:Connect(function()
+    healerMode = not healerMode
+    batchMode = false
+    batchHealMode = false
+    
+    if healerMode then
+        HealerModeButton.BackgroundColor3 = Color3.fromRGB(0, 180, 100)
+        HealerModeButton.Text = "💚 HEALER MODE: ON"
+        HealerPanel.Visible = true
+        BatchModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        BatchModeButton.Text = "🔘 BATCH MODE: OFF"
+        BatchActionsFrame.Visible = false
+        BatchHealModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        BatchHealModeButton.Text = "💚🔄 BATCH HEAL: OFF"
+        BatchHealActionsFrame.Visible = false
+        UpgradePanel.Visible = false
+        selectedTower = nil
+        
+        RefreshHealerPanel()
+    else
+        HealerModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        HealerModeButton.Text = "💚 HEALER MODE: OFF"
+        HealerPanel.Visible = false
+        healerTargets = {}
+        activeHealer = nil
+        UpdateHealerStatus()
+    end
+    
+    RefreshList()
+end)
+
+BatchHealModeButton.MouseButton1Click:Connect(function()
+    batchHealMode = not batchHealMode
+    batchMode = false
+    healerMode = false
+    HealerPanel.Visible = false
+    
+    if batchHealMode then
+        BatchHealModeButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+        BatchHealModeButton.Text = "💚🔄 BATCH HEAL: ON"
+        BatchHealActionsFrame.Visible = true
+        BatchModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        BatchModeButton.Text = "🔘 BATCH MODE: OFF"
+        BatchActionsFrame.Visible = false
+        HealerModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        HealerModeButton.Text = "💚 HEALER MODE: OFF"
+        UpgradePanel.Visible = false
+        selectedTower = nil
+    else
+        BatchHealModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        BatchHealModeButton.Text = "💚🔄 BATCH HEAL: OFF"
+        BatchHealActionsFrame.Visible = false
+        batchHealTargets = {}
+        UpdateBatchHealCount()
+    end
+    
+    RefreshList()
+end)
+
+HealerPanelClose.MouseButton1Click:Connect(function()
+    healerMode = false
+    HealerPanel.Visible = false
+    HealerModeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    HealerModeButton.Text = "💚 HEALER MODE: OFF"
+    healerTargets = {}
+    activeHealer = nil
+    UpdateHealerStatus()
+    RefreshList()
+end)
+
+RefreshButton.MouseButton1Click:Connect(function()
+    RefreshList()
+    if healerMode then
+        RefreshHealerPanel()
+    end
+end)
 
 BatchUpgradeEButton.MouseButton1Click:Connect(function()
     UpgradeSelectedBatch("Top")
@@ -992,9 +1715,27 @@ BatchUpgradeZButton.MouseButton1Click:Connect(function()
     UpgradeSelectedBatch("Bottom")
 end)
 
+ApplyHealerBtn.MouseButton1Click:Connect(function()
+    ApplyHealerLinks()
+end)
+
+BatchHealApplyBtn.MouseButton1Click:Connect(function()
+    ApplyBatchHeal()
+end)
+
+BatchHealUnapplyBtn.MouseButton1Click:Connect(function()
+    UnapplyBatchHeal()
+end)
+
 ClearBatchButton.MouseButton1Click:Connect(function()
     selectedBatch = {}
     UpdateBatchCount()
+    RefreshList()
+end)
+
+ClearBatchHealButton.MouseButton1Click:Connect(function()
+    batchHealTargets = {}
+    UpdateBatchHealCount()
     RefreshList()
 end)
 
@@ -1024,7 +1765,7 @@ CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- MINIMIZE
+-- Minimize
 local isMinimized = false
 local originalSize = MainFrame.Size
 
@@ -1032,12 +1773,16 @@ MinimizeButton.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     
     BatchModeButton.Visible = not isMinimized
+    HealerModeButton.Visible = not isMinimized
+    BatchHealModeButton.Visible = not isMinimized
     BatchActionsFrame.Visible = batchMode and not isMinimized
+    BatchHealActionsFrame.Visible = batchHealMode and not isMinimized
     FilterButton.Visible = not isMinimized
     SellAllButton.Visible = not isMinimized
     TowerScroll.Visible = not isMinimized
     PageFrame.Visible = not isMinimized
     UpgradePanel.Visible = false
+    HealerPanel.Visible = healerMode and not isMinimized
     
     if isMinimized then
         MainFrame.Size = UDim2.new(0, 280, 0, 40)
@@ -1063,7 +1808,7 @@ NextPageButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Drag
+-- Drag main frame
 local dragging = false
 local dragStart = nil
 local startPos = nil
@@ -1101,6 +1846,37 @@ game:GetService("UserInputService").InputEnded:Connect(function(input)
     end
 end)
 
+-- Drag healer panel
+local healerDragging = false
+local healerDragStart = nil
+local healerStartPos = nil
+
+HealerPanelHeader.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        healerDragging = true
+        healerDragStart = input.Position
+        healerStartPos = HealerPanel.Position
+    end
+end)
+
+HealerPanelHeader.InputChanged:Connect(function(input)
+    if healerDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - healerDragStart
+        HealerPanel.Position = UDim2.new(
+            healerStartPos.X.Scale,
+            healerStartPos.X.Offset + delta.X,
+            healerStartPos.Y.Scale,
+            healerStartPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        healerDragging = false
+    end
+end)
+
 -- Auto refresh
 task.spawn(function()
     while true do
@@ -1108,6 +1884,10 @@ task.spawn(function()
         if not isMinimized then
             RefreshList()
             UpdatePanelInfo()
+            
+            if healerMode then
+                RefreshHealerPanel()
+            end
         end
     end
 end)
@@ -1130,8 +1910,21 @@ getgenv().TowerManager = {
     Sell = SellTower,
     SellAll = SellAllTowers,
     UpgradeBatch = UpgradeSelectedBatch,
+    HealerBuff = ApplyHealerLinks,
+    BatchHeal = ApplyBatchHeal,
+    BatchHealUnapply = UnapplyBatchHeal,
+    SetActiveHealer = function(healer)
+        activeHealer = healer
+        UpdateHealerStatus()
+        RefreshHealerPanel()
+    end,
+    GetHealers = FindAllHealers,
     IsTracked = function(tower)
         return towerRegistry[tower] ~= nil
+    end,
+    IsHealed = IsHealLinked,
+    SetHealSlotCapacity = function(n)
+        healSlotCapacity = n
     end,
     RegisterTower = function(tower, unitName, x, z)
         if not tower or not tower.Parent then return end
@@ -1166,6 +1959,9 @@ getgenv().TowerManager = {
 }
 
 print("=================================")
-print("🏗️ TOWER MANAGER - MINIMIZE + SELECT ALL")
-print("Collapsible groups + pagination")
+print("🏗️ TOWER MANAGER - BATCH HEAL + UNAPPLY")
+print("💚 Healer mode: pilih 1 medic, pilih target, apply link")
+print("💚🔄 Batch Heal: semua medic distribusi ke semua target")
+print("💔 Unapply: hapus link dari target terpilih")
+print("⛔ Self-target otomatis di-block")
 print("=================================")
