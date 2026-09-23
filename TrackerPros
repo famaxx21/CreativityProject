@@ -1,0 +1,1073 @@
+-- Check for table that is shared between executions.
+if not shared then
+	return warn("No shared, no script.")
+end
+
+-- Services.
+local playersService = game:GetService("Players")
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local userInputService = game:GetService("UserInputService")
+local workspaceService = game:GetService("Workspace")
+local runService = game:GetService("RunService")
+local tweenService = game:GetService("TweenService")
+
+-- Palette.
+local C = {
+	bg        = Color3.fromRGB(15, 15, 20),
+	card      = Color3.fromRGB(24, 24, 32),
+	cardAlt   = Color3.fromRGB(30, 30, 40),
+	stroke    = Color3.fromRGB(48, 48, 62),
+	text      = Color3.fromRGB(240, 240, 245),
+	textDim   = Color3.fromRGB(130, 130, 150),
+	textFaint = Color3.fromRGB(80, 80, 100),
+	accent    = Color3.fromRGB(139, 92, 246),
+	green     = Color3.fromRGB(52, 211, 153),
+	pink      = Color3.fromRGB(236, 72, 153),
+	amber     = Color3.fromRGB(251, 191, 36),
+	orange    = Color3.fromRGB(251, 146, 60),
+	blue      = Color3.fromRGB(96, 165, 250),
+	cyan      = Color3.fromRGB(34, 211, 238),
+	red       = Color3.fromRGB(239, 68, 68),
+	danger    = Color3.fromRGB(239, 68, 68),
+}
+local FONT = Enum.Font.GothamMedium
+local FONT_BOLD = Enum.Font.GothamBold
+
+local NPC_HIGHLIGHT_FILL = Color3.fromRGB(255, 80, 80)
+local NPC_HIGHLIGHT_OUTLINE = Color3.fromRGB(255, 255, 255)
+local NPC_TRACER_COLOR = Color3.fromRGB(255, 100, 100)
+local NPC_NAME_COLOR = Color3.fromRGB(255, 255, 255)
+local TOTEM_HIGHLIGHT_FILL = Color3.fromRGB(200, 120, 255)
+local TOTEM_HIGHLIGHT_OUTLINE = Color3.fromRGB(255, 255, 255)
+
+-- Timing.
+local POLL_INTERVAL = 0.75
+local SELL_DELAY = 1.5
+local SELL_COOLDOWN = 1.0
+local SELL_THRESHOLD = 0.95
+local NPC_SCAN_INTERVAL = 1.5
+local TOTEM_SCAN_INTERVAL = 2.0
+local SESSION_RESET_INTERVAL = 600
+
+-- Paths.
+local INVENTORY_LABEL_PATHS = {
+	{ "BackpackGui", "Backpack", "Inventory", "TopButtons", "Unaffected", "InventorySize" },
+	{ "ToolUI", "FillingPan", "InventorySpace" },
+	{ "MainUI", "StorageAccess", "Body", "InventoryCapacity" },
+}
+local SELL_REMOTE_PATH = { "Remotes", "Shop", "SellAll" }
+local WAYPOINT_ROOT = { "Map", "Waypoints" }
+
+local FAST_TRAVEL_GUI_HINTS = {
+	"waypoint", "fasttravel", "fast_travel", "fast travel",
+	"travel", "mapmenu", "map_menu", "worldmap", "world_map",
+	"teleport", "waypointgui", "mapui", "map_ui",
+}
+
+local TOTEM_NAME_PATTERN = "totem"
+
+-- State.
+local localPlayer = playersService.LocalPlayer
+local uiVisible = true
+
+local cachedPlayerGui
+local cachedSellRemote
+local cachedMoneyLabel
+local cachedInventoryLabel
+
+local moneyValue
+local profitValue
+local npcCountLabel
+local sellCountLabel
+local inventoryValue
+
+local autoSell = false
+local autoJump = false
+local npcEspEnabled = false
+local npcTracerEnabled = true
+local npcHighlightEnabled = true
+local npcNameEnabled = true
+local totemEspEnabled = false
+
+local lastSellTime = 0
+local sellArmedAt = nil
+local sellCount = 0
+
+local sessionBaseline = nil
+local sessionBaselineSetAt = 0
+
+local trackedNpcs = {}
+local trackedTotems = {}
+
+-- Lookups ------------------------------------------------------------------
+
+local function getPlayerGui()
+	if cachedPlayerGui and cachedPlayerGui.Parent then
+		return cachedPlayerGui
+	end
+	local pg = localPlayer:FindFirstChildOfClass("PlayerGui")
+	if pg then cachedPlayerGui = pg end
+	return pg
+end
+
+-- Parsing ------------------------------------------------------------------
+
+local function stripRichText(text)
+	return (text:gsub("<[^>]->", ""))
+end
+
+local function parseMoney(raw)
+	if not raw or #raw == 0 then return nil end
+	local text = stripRichText(raw):gsub("^%s+", ""):gsub("%s+$", "")
+	if text:sub(1, 1) == "+" or text:sub(1, 1) == "-" then return nil end
+	if text:sub(1, 1) ~= "$" then return nil end
+	local numStr = text:match("^%$([%d,]+)$")
+	return numStr and tonumber((numStr:gsub(",", ""))) or nil
+end
+
+local function parseRatio(raw)
+	if not raw then return nil, nil end
+	local currentStr = (raw:match("^(%d+)%s*/%s*%d+$"))
+	local maxStr = (raw:match("^%d+%s*/%s*(%d+)$"))
+	return currentStr and tonumber(currentStr) or nil,
+	       maxStr and tonumber(maxStr) or nil
+end
+
+local function commaFormat(n)
+	local neg = n < 0
+	local s = tostring(math.floor(math.abs(n)))
+	local k
+	repeat
+		s, k = s:gsub("^(%d+)(%d%d%d)", "%1,%2")
+	until k == 0
+	return (neg and "-" or "") .. s
+end
+
+-- Detection ----------------------------------------------------------------
+
+local function getMoney()
+	if cachedMoneyLabel and cachedMoneyLabel.Parent then
+		local c = parseMoney(cachedMoneyLabel.Text)
+		if c then return c end
+	end
+	local playerGui = getPlayerGui()
+	if not playerGui then return nil end
+	local best, bestVal
+	for _, d in ipairs(playerGui:GetDescendants()) do
+		if d:IsA("TextLabel") or d:IsA("TextButton") then
+			local m = parseMoney(d.Text)
+			if m and (not bestVal or m > bestVal) then
+				best, bestVal = d, m
+			end
+		end
+	end
+	if best then
+		cachedMoneyLabel = best
+		return bestVal
+	end
+	return nil
+end
+
+local function resolvePath(root, path)
+	local current = root
+	for _, name in ipairs(path) do
+		if not current then return nil end
+		current = current:FindFirstChild(name)
+	end
+	return current
+end
+
+local function locateInventoryLabel()
+	local playerGui = getPlayerGui()
+	if not playerGui then return nil end
+	for _, path in ipairs(INVENTORY_LABEL_PATHS) do
+		local label = resolvePath(playerGui, path)
+		if label and label:IsA("TextLabel") then
+			local c, m = parseRatio(label.Text)
+			if c and m then return label end
+		end
+	end
+	return nil
+end
+
+local function readInventory()
+	if cachedInventoryLabel and cachedInventoryLabel.Parent then
+		local c, m = parseRatio(cachedInventoryLabel.Text)
+		if c and m then return c, m end
+	end
+	local label = locateInventoryLabel()
+	if not label then return nil, nil end
+	cachedInventoryLabel = label
+	return parseRatio(label.Text)
+end
+
+local function resolveSellRemote()
+	if cachedSellRemote and cachedSellRemote.Parent then
+		return cachedSellRemote
+	end
+	local remote = resolvePath(replicatedStorage, SELL_REMOTE_PATH)
+	if remote then cachedSellRemote = remote end
+	return remote
+end
+
+local function sellAll()
+	local remote = resolveSellRemote()
+	if not remote then return false end
+	return pcall(function()
+		if remote:IsA("RemoteFunction") then
+			remote:InvokeServer()
+		else
+			remote:FireServer()
+		end
+	end)
+end
+
+-- NPC detection ------------------------------------------------------------
+
+local function isPlayerCharacter(model)
+	for _, player in ipairs(playersService:GetPlayers()) do
+		if player.Character == model then
+			return true
+		end
+	end
+	return false
+end
+
+local function isNpc(model)
+	if not model:IsA("Model") then return false end
+	if isPlayerCharacter(model) then return false end
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return false end
+	if humanoid.Health <= 0 then return false end
+	local hrp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head")
+	if not hrp then return false end
+	return true
+end
+
+local function getNpcAnchor(model)
+	return model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head")
+end
+
+-- Gets the topmost part of the model for name positioning.
+local function getNpcHeadTop(model)
+	local head = model:FindFirstChild("Head")
+	if head then
+		return head.Position + Vector3.new(0, head.Size.Y / 2 + 1.5, 0)
+	end
+	local hrp = model:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		return hrp.Position + Vector3.new(0, 3, 0)
+	end
+	return nil
+end
+
+-- Returns the display name to show above the NPC.
+local function getNpcDisplayName(model)
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.DisplayName and humanoid.DisplayName ~= "" then
+		return humanoid.DisplayName
+	end
+	return model.Name
+end
+
+-- NPC ESP ------------------------------------------------------------------
+
+local function createTracer()
+	local line = Drawing.new("Line")
+	line.Thickness = 1.5
+	line.Color = NPC_TRACER_COLOR
+	line.Transparency = 1
+	line.Visible = false
+	return line
+end
+
+local function createNameTag()
+	local text = Drawing.new("Text")
+	text.Size = 14
+	text.Center = true
+	text.Outline = true
+	text.OutlineColor = Color3.new(0, 0, 0)
+	text.Color = NPC_NAME_COLOR
+	text.Font = Drawing.Fonts.UI
+	text.Visible = false
+	return text
+end
+
+local function ensureNpcEsp(npc)
+	local data = trackedNpcs[npc]
+	if not data then
+		data = {}
+		trackedNpcs[npc] = data
+	end
+
+	if npcHighlightEnabled and not data.highlight then
+		local hl = Instance.new("Highlight")
+		hl.Name = "PotentNpcHighlight"
+		hl.FillColor = NPC_HIGHLIGHT_FILL
+		hl.OutlineColor = NPC_HIGHLIGHT_OUTLINE
+		hl.FillTransparency = 0.6
+		hl.OutlineTransparency = 0
+		hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		hl.Adornee = npc
+		hl.Enabled = npcEspEnabled
+		hl.Parent = npc
+		data.highlight = hl
+	end
+
+	if npcTracerEnabled and not data.tracer then
+		data.tracer = createTracer()
+	end
+
+	if npcNameEnabled and not data.nameTag then
+		data.nameTag = createNameTag()
+		data.nameTag.Text = getNpcDisplayName(npc)
+	end
+end
+
+local function removeNpcEsp(npc)
+	local data = trackedNpcs[npc]
+	if not data then return end
+	if data.highlight then
+		pcall(function() data.highlight:Destroy() end)
+	end
+	if data.tracer then
+		pcall(function() data.tracer:Remove() end)
+	end
+	if data.nameTag then
+		pcall(function() data.nameTag:Remove() end)
+	end
+	trackedNpcs[npc] = nil
+end
+
+local function applyNpcEspState()
+	for npc, data in pairs(trackedNpcs) do
+		-- Highlight.
+		if npcHighlightEnabled and not data.highlight then
+			local hl = Instance.new("Highlight")
+			hl.Name = "PotentNpcHighlight"
+			hl.FillColor = NPC_HIGHLIGHT_FILL
+			hl.OutlineColor = NPC_HIGHLIGHT_OUTLINE
+			hl.FillTransparency = 0.6
+			hl.OutlineTransparency = 0
+			hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+			hl.Adornee = npc
+			hl.Enabled = npcEspEnabled
+			hl.Parent = npc
+			data.highlight = hl
+		end
+		if data.highlight then
+			data.highlight.Enabled = npcEspEnabled and npcHighlightEnabled
+		end
+
+		-- Tracer.
+		if npcTracerEnabled and not data.tracer then
+			data.tracer = createTracer()
+		end
+		if data.tracer and not (npcEspEnabled and npcTracerEnabled) then
+			data.tracer.Visible = false
+		end
+
+		-- Name tag.
+		if npcNameEnabled and not data.nameTag then
+			data.nameTag = createNameTag()
+			data.nameTag.Text = getNpcDisplayName(npc)
+		end
+		if data.nameTag and not (npcEspEnabled and npcNameEnabled) then
+			data.nameTag.Visible = false
+		end
+	end
+end
+
+local function scanNpcEsp()
+	local seen = {}
+
+	for _, d in ipairs(workspaceService:GetDescendants()) do
+		if d:IsA("Model") and isNpc(d) then
+			seen[d] = true
+			ensureNpcEsp(d)
+		end
+	end
+
+	for npc in pairs(trackedNpcs) do
+		if not seen[npc] or not npc.Parent then
+			removeNpcEsp(npc)
+		end
+	end
+
+	local count = 0
+	for _ in pairs(trackedNpcs) do count = count + 1 end
+	if npcCountLabel then npcCountLabel.Text = tostring(count) end
+end
+
+local function updateTracers()
+	if not npcEspEnabled then return end
+
+	local camera = workspaceService.CurrentCamera
+	if not camera then return end
+	local viewport = camera.ViewportSize
+	local origin = Vector2.new(viewport.X / 2, viewport.Y - 40)
+
+	for npc, data in pairs(trackedNpcs) do
+		-- Tracer update.
+		if npcTracerEnabled and data.tracer then
+			local line = data.tracer
+			if npc.Parent then
+				local hrp = getNpcAnchor(npc)
+				if hrp then
+					local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+					if onScreen then
+						line.From = origin
+						line.To = Vector2.new(screenPos.X, screenPos.Y)
+						line.Visible = true
+					else
+						line.Visible = false
+					end
+				else
+					line.Visible = false
+				end
+			else
+				line.Visible = false
+			end
+		end
+
+		-- Name tag update.
+		if npcNameEnabled and data.nameTag then
+			local tag = data.nameTag
+			if npc.Parent then
+				local topPos = getNpcHeadTop(npc)
+				if topPos then
+					local screenPos, onScreen = camera:WorldToViewportPoint(topPos)
+					if onScreen then
+						tag.Position = Vector2.new(screenPos.X, screenPos.Y)
+						-- Refresh name in case DisplayName changed.
+						local currentName = getNpcDisplayName(npc)
+						if tag.Text ~= currentName then
+							tag.Text = currentName
+						end
+						tag.Visible = true
+					else
+						tag.Visible = false
+					end
+				else
+					tag.Visible = false
+				end
+			else
+				tag.Visible = false
+			end
+		end
+	end
+end
+
+-- Totem ESP ---------------------------------------------------------------
+
+local function isTotem(instance)
+	if not (instance:IsA("Model") or instance:IsA("BasePart")) then
+		return false
+	end
+	return instance.Name:lower():find(TOTEM_NAME_PATTERN, 1, true) ~= nil
+end
+
+local function ensureTotemEsp(totem)
+	if not trackedTotems[totem] then
+		local hl = Instance.new("Highlight")
+		hl.Name = "PotentTotemHighlight"
+		hl.FillColor = TOTEM_HIGHLIGHT_FILL
+		hl.OutlineColor = TOTEM_HIGHLIGHT_OUTLINE
+		hl.FillTransparency = 0.5
+		hl.OutlineTransparency = 0
+		hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		hl.Adornee = totem
+		hl.Enabled = totemEspEnabled
+		hl.Parent = totem
+		trackedTotems[totem] = hl
+	end
+end
+
+local function removeTotemEsp(totem)
+	local hl = trackedTotems[totem]
+	if hl then hl:Destroy() end
+	trackedTotems[totem] = nil
+end
+
+local function scanTotems()
+	local seen = {}
+	for _, d in ipairs(workspaceService:GetDescendants()) do
+		if isTotem(d) then
+			seen[d] = true
+			ensureTotemEsp(d)
+		end
+	end
+	for totem in pairs(trackedTotems) do
+		if not seen[totem] or not totem.Parent then
+			removeTotemEsp(totem)
+		end
+	end
+	for _, hl in pairs(trackedTotems) do
+		hl.Enabled = totemEspEnabled
+	end
+end
+
+-- Fast travel ---------------------------------------------------------------
+
+local function nameMatchesFastTravel(name)
+	local lower = name:lower()
+	for _, hint in ipairs(FAST_TRAVEL_GUI_HINTS) do
+		if lower:find(hint, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+local function revealFastTravelGui()
+	local playerGui = getPlayerGui()
+	if not playerGui then return false end
+	local revealed = false
+	for _, d in ipairs(playerGui:GetDescendants()) do
+		if d:IsA("ScreenGui") or d:IsA("Folder") or d:IsA("Frame") then
+			if nameMatchesFastTravel(d.Name) then
+				if d:IsA("ScreenGui") then
+					pcall(function() d.Enabled = true end)
+					revealed = true
+				end
+				if d:IsA("GuiObject") then
+					local node = d
+					while node and node ~= playerGui do
+						if node:IsA("GuiObject") then
+							pcall(function() node.Visible = true end)
+						end
+						node = node.Parent
+					end
+					revealed = true
+				end
+			end
+		end
+	end
+	return revealed
+end
+
+local function fireWaypointPrompt()
+	local waypointRoot = resolvePath(workspaceService, WAYPOINT_ROOT)
+	if not waypointRoot then return false end
+	for _, d in ipairs(waypointRoot:GetDescendants()) do
+		if d:IsA("ProximityPrompt") then
+			local ok = pcall(function()
+				d.Enabled = true
+				d.MaxActivationDistance = math.huge
+				d.HoldDuration = 0
+				fireproximityprompt(d)
+			end)
+			if ok then return true end
+		end
+	end
+	return false
+end
+
+local function fireWaypointClick()
+	local waypointRoot = resolvePath(workspaceService, WAYPOINT_ROOT)
+	if not waypointRoot then return false end
+	for _, d in ipairs(waypointRoot:GetDescendants()) do
+		if d:IsA("ClickDetector") then
+			local ok = pcall(function()
+				d.MaxActivationDistance = math.huge
+				fireclickdetector(d, math.huge, "MouseClick")
+			end)
+			if ok then return true end
+		end
+	end
+	return false
+end
+
+local function openFastTravel()
+	if revealFastTravelGui() then return true, "revealed UI" end
+	if fireWaypointPrompt() then return true, "fired waypoint prompt" end
+	if fireWaypointClick() then return true, "fired click detector" end
+	return false, "no method worked"
+end
+
+-- Auto jump ---------------------------------------------------------------
+
+local function isOnGround(humanoid)
+	return humanoid.FloorMaterial ~= Enum.Material.Air
+end
+
+local function tryJump(humanoid)
+	if not isOnGround(humanoid) then return end
+	pcall(function() humanoid.Jump = true end)
+	task.wait(0.05)
+	local state = humanoid:GetState()
+	if state ~= Enum.HumanoidStateType.Jumping
+		and state ~= Enum.HumanoidStateType.Freefall
+	then
+		pcall(function()
+			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		end)
+	end
+end
+
+local function runJumpTick()
+	if not autoJump then return end
+	local character = localPlayer.Character
+	if not character then return end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then return end
+	local state = humanoid:GetState()
+	if state == Enum.HumanoidStateType.Jumping
+		or state == Enum.HumanoidStateType.Freefall
+		or state == Enum.HumanoidStateType.Swimming
+		or state == Enum.HumanoidStateType.Climbing
+		or state == Enum.HumanoidStateType.Dead
+	then
+		return
+	end
+	pcall(tryJump, humanoid)
+end
+
+-- UI helpers ----------------------------------------------------------------
+
+local function makeCorner(parent, radius)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, radius)
+	c.Parent = parent
+	return c
+end
+
+local function makeStroke(parent, color, thickness, transparency)
+	local s = Instance.new("UIStroke")
+	s.Color = color
+	s.Thickness = thickness or 1
+	s.Transparency = transparency or 0.5
+	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	s.Parent = parent
+	return s
+end
+
+local function makeLabel(parent, text, size, position, bold, textColor, textSize, alignment)
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = size
+	label.Position = position
+	label.Font = bold and FONT_BOLD or FONT
+	label.Text = text
+	label.TextColor3 = textColor or C.text
+	label.TextSize = textSize or 13
+	label.TextXAlignment = alignment or Enum.TextXAlignment.Left
+	label.TextYAlignment = Enum.TextYAlignment.Center
+	label.Parent = parent
+	return label
+end
+
+local function makeSectionTitle(parent, text, yOffset)
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.new(1, -24, 0, 16)
+	holder.Position = UDim2.new(0, 12, 0, yOffset)
+	holder.BackgroundTransparency = 1
+	holder.Parent = parent
+
+	local bar = Instance.new("Frame")
+	bar.Size = UDim2.new(0, 3, 0, 10)
+	bar.Position = UDim2.new(0, 0, 0, 3)
+	bar.BackgroundColor3 = C.accent
+	bar.BorderSizePixel = 0
+	bar.Parent = holder
+	makeCorner(bar, 2)
+
+	makeLabel(holder, text:upper(), UDim2.new(1, -10, 1, 0), UDim2.new(0, 10, 0, 0), true, C.textDim, 10)
+end
+
+local function makeWideCard(parent, title, subtitle, valueColor, yOffset)
+	local card = Instance.new("Frame")
+	card.Size = UDim2.new(1, -24, 0, 64)
+	card.Position = UDim2.new(0, 12, 0, yOffset)
+	card.BackgroundColor3 = C.card
+	card.BorderSizePixel = 0
+	card.Parent = parent
+	makeCorner(card, 10)
+	makeStroke(card, C.stroke, 1, 0.7)
+
+	local bar = Instance.new("Frame")
+	bar.Size = UDim2.new(0, 3, 0, 22)
+	bar.Position = UDim2.new(0, 12, 0.5, -11)
+	bar.BackgroundColor3 = valueColor
+	bar.BorderSizePixel = 0
+	bar.Parent = card
+	makeCorner(bar, 2)
+
+	makeLabel(card, title:upper(), UDim2.new(1, -100, 0, 12), UDim2.new(0, 22, 0, 8), true, C.textFaint, 9)
+	makeLabel(card, subtitle, UDim2.new(1, -100, 0, 12), UDim2.new(1, -80, 0, 8), false, C.textFaint, 9, Enum.TextXAlignment.Right)
+
+	local valueLabel = makeLabel(card, "--", UDim2.new(1, -24, 0, 28), UDim2.new(0, 22, 0, 22), true, valueColor, 22)
+	valueLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	return valueLabel
+end
+
+local function makeSwitch(parent, text, yOffset, accentColor, callback, initial)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, -24, 0, 38)
+	row.Position = UDim2.new(0, 12, 0, yOffset)
+	row.BackgroundColor3 = C.card
+	row.BorderSizePixel = 0
+	row.Parent = parent
+	makeCorner(row, 8)
+	makeStroke(row, C.stroke, 1, 0.7)
+
+	makeLabel(row, text, UDim2.new(1, -70, 1, 0), UDim2.new(0, 14, 0, 0), false, C.text, 13)
+
+	local track = Instance.new("Frame")
+	track.Size = UDim2.new(0, 40, 0, 22)
+	track.Position = UDim2.new(1, -54, 0.5, -11)
+	track.BackgroundColor3 = C.cardAlt
+	track.BorderSizePixel = 0
+	track.Parent = row
+	makeCorner(track, 11)
+
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 16, 0, 16)
+	knob.Position = UDim2.new(0, 3, 0.5, -8)
+	knob.BackgroundColor3 = C.textFaint
+	knob.BorderSizePixel = 0
+	knob.Parent = track
+	makeCorner(knob, 8)
+
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, 0, 1, 0)
+	button.BackgroundTransparency = 1
+	button.Text = ""
+	button.Parent = row
+
+	local active = initial or false
+
+	local function refresh(animate)
+		local trackGoal = active and accentColor or C.cardAlt
+		local knobPos = active and UDim2.new(0, 21, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+		local knobColor = active and Color3.new(1, 1, 1) or C.textFaint
+		if animate then
+			tweenService:Create(track, TweenInfo.new(0.15, Enum.EasingStyle.Quad), { BackgroundColor3 = trackGoal }):Play()
+			tweenService:Create(knob, TweenInfo.new(0.15, Enum.EasingStyle.Quad), { Position = knobPos, BackgroundColor3 = knobColor }):Play()
+		else
+			track.BackgroundColor3 = trackGoal
+			knob.Position = knobPos
+			knob.BackgroundColor3 = knobColor
+		end
+	end
+
+	button.MouseEnter:Connect(function() makeStroke(row, accentColor, 1, 0.5) end)
+	button.MouseLeave:Connect(function() makeStroke(row, C.stroke, 1, 0.7) end)
+	button.MouseButton1Click:Connect(function()
+		active = not active
+		refresh(true)
+		callback(active)
+	end)
+	refresh(false)
+	return row
+end
+
+local function makeActionButton(parent, text, yOffset, color, callback)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -24, 0, 34)
+	btn.Position = UDim2.new(0, 12, 0, yOffset)
+	btn.BackgroundColor3 = color
+	btn.BorderSizePixel = 0
+	btn.Font = FONT_BOLD
+	btn.Text = text
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.TextSize = 13
+	btn.AutoButtonColor = false
+	btn.Parent = parent
+	makeCorner(btn, 8)
+
+	local baseColor = color
+	local hoverColor = Color3.new(
+		math.min(baseColor.R + 0.08, 1),
+		math.min(baseColor.G + 0.08, 1),
+		math.min(baseColor.B + 0.08, 1)
+	)
+
+	btn.MouseEnter:Connect(function() btn.BackgroundColor3 = hoverColor end)
+	btn.MouseLeave:Connect(function() btn.BackgroundColor3 = baseColor end)
+	btn.MouseButton1Click:Connect(callback)
+	return btn
+end
+
+-- Builds the GUI.
+local function buildUi()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "PotentTracker"
+	gui.ResetOnSpawn = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.Parent = gethui and gethui() or localPlayer:WaitForChild("PlayerGui")
+
+	local main = Instance.new("Frame")
+	main.Name = "Main"
+	main.Size = UDim2.new(0, 320, 0, 810)
+	main.Position = UDim2.new(1, -340, 0, 60)
+	main.BackgroundColor3 = C.bg
+	main.BorderSizePixel = 0
+	main.Active = true
+	main.Draggable = true
+	main.Parent = gui
+	makeCorner(main, 12)
+	makeStroke(main, C.accent, 1, 0.4)
+
+	-- Header.
+	local header = Instance.new("Frame")
+	header.Size = UDim2.new(1, 0, 0, 44)
+	header.BackgroundColor3 = C.card
+	header.BorderSizePixel = 0
+	header.Parent = main
+	makeCorner(header, 12)
+
+	local bottomCover = Instance.new("Frame")
+	bottomCover.Size = UDim2.new(1, 0, 0, 12)
+	bottomCover.Position = UDim2.new(0, 0, 1, -12)
+	bottomCover.BackgroundColor3 = C.card
+	bottomCover.BorderSizePixel = 0
+	bottomCover.Parent = header
+
+	local dot = Instance.new("Frame")
+	dot.Size = UDim2.new(0, 8, 0, 8)
+	dot.Position = UDim2.new(0, 14, 0.5, -4)
+	dot.BackgroundColor3 = C.accent
+	dot.BorderSizePixel = 0
+	dot.Parent = header
+	makeCorner(dot, 4)
+
+	makeLabel(header, "Potent", UDim2.new(0, 100, 1, 0), UDim2.new(0, 30, 0, 0), true, C.text, 15)
+	makeLabel(header, "tracker", UDim2.new(1, -140, 1, 0), UDim2.new(0, 88, 0, 0), false, C.textFaint, 12)
+
+	local close = Instance.new("TextButton")
+	close.Size = UDim2.new(0, 26, 0, 26)
+	close.Position = UDim2.new(1, -38, 0.5, -13)
+	close.BackgroundColor3 = C.cardAlt
+	close.Text = "×"
+	close.Font = FONT_BOLD
+	close.TextColor3 = C.textDim
+	close.TextSize = 16
+	close.BorderSizePixel = 0
+	close.AutoButtonColor = false
+	close.Parent = header
+	makeCorner(close, 6)
+	close.MouseEnter:Connect(function()
+		close.BackgroundColor3 = C.danger
+		close.TextColor3 = Color3.new(1, 1, 1)
+	end)
+	close.MouseLeave:Connect(function()
+		close.BackgroundColor3 = C.cardAlt
+		close.TextColor3 = C.textDim
+	end)
+
+	-- Earnings.
+	makeSectionTitle(main, "Earnings", 58)
+	profitValue = makeWideCard(main, "Session Profit", "reset 10m", C.green, 78)
+	moneyValue = makeWideCard(main, "Money", "total", C.amber, 150)
+
+	-- Fast Travel.
+	makeSectionTitle(main, "Fast Travel", 226)
+	makeActionButton(main, "Open Fast Travel UI", 246, C.accent, function()
+		local ok, method = openFastTravel()
+		if not ok then
+			warn("[Potent] Fast travel gagal: " .. tostring(method))
+		end
+	end)
+
+	-- NPC ESP.
+	makeSectionTitle(main, "NPC ESP", 288)
+
+	makeSwitch(main, "NPC ESP", 308, C.green, function(state)
+		npcEspEnabled = state
+		applyNpcEspState()
+	end)
+	makeSwitch(main, "Tracer", 346, C.cyan, function(state)
+		npcTracerEnabled = state
+		applyNpcEspState()
+	end, true)
+	makeSwitch(main, "Highlight", 384, C.green, function(state)
+		npcHighlightEnabled = state
+		applyNpcEspState()
+	end, true)
+	makeSwitch(main, "Show Name", 422, C.amber, function(state)
+		npcNameEnabled = state
+		applyNpcEspState()
+	end, true)
+
+	local npcRow = Instance.new("Frame")
+	npcRow.Size = UDim2.new(1, -24, 0, 24)
+	npcRow.Position = UDim2.new(0, 12, 0, 464)
+	npcRow.BackgroundTransparency = 1
+	npcRow.Parent = main
+
+	makeLabel(npcRow, "NPC terdeteksi", UDim2.new(1, -50, 1, 0), UDim2.new(0, 4, 0, 0), false, C.textDim, 11)
+
+	local pill = Instance.new("Frame")
+	pill.Size = UDim2.new(0, 42, 0, 18)
+	pill.Position = UDim2.new(1, -42, 0.5, -9)
+	pill.BackgroundColor3 = C.cardAlt
+	pill.BorderSizePixel = 0
+	pill.Parent = npcRow
+	makeCorner(pill, 9)
+
+	npcCountLabel = makeLabel(pill, "0", UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), true, C.orange, 11, Enum.TextXAlignment.Center)
+
+	-- Totem ESP.
+	makeSectionTitle(main, "Totem ESP", 494)
+
+	makeSwitch(main, "Totem ESP", 514, C.pink, function(state)
+		totemEspEnabled = state
+		for _, hl in pairs(trackedTotems) do
+			hl.Enabled = state
+		end
+	end)
+
+	-- Automation.
+	makeSectionTitle(main, "Automation", 558)
+
+	makeSwitch(main, "Auto Jump", 578, C.blue, function(state) autoJump = state end)
+	makeSwitch(main, "Auto Sell", 616, C.green, function(state)
+		autoSell = state
+		if not state then sellArmedAt = nil end
+	end)
+
+	-- Footer.
+	local footer = Instance.new("Frame")
+	footer.Size = UDim2.new(1, -24, 0, 58)
+	footer.Position = UDim2.new(0, 12, 0, 662)
+	footer.BackgroundColor3 = C.card
+	footer.BorderSizePixel = 0
+	footer.Parent = main
+	makeCorner(footer, 10)
+	makeStroke(footer, C.stroke, 1, 0.7)
+
+	makeLabel(footer, "INVENTORY", UDim2.new(0, 70, 0, 10), UDim2.new(0, 14, 0, 8), true, C.textFaint, 9)
+	inventoryValue = makeLabel(footer, "--/--", UDim2.new(0, 100, 0, 20), UDim2.new(0, 14, 0, 22), true, C.green, 15)
+
+	makeLabel(footer, "SOLD", UDim2.new(0, 50, 0, 10), UDim2.new(1, -94, 0, 8), true, C.textFaint, 9, Enum.TextXAlignment.Right)
+	sellCountLabel = makeLabel(footer, "0", UDim2.new(0, 80, 0, 20), UDim2.new(1, -94, 0, 22), true, C.green, 15, Enum.TextXAlignment.Right)
+
+	makeActionButton(main, "Sell Sekarang", 726, C.cardAlt, function()
+		if sellAll() then
+			sellCount = sellCount + 1
+			if sellCountLabel then sellCountLabel.Text = tostring(sellCount) end
+		end
+	end)
+
+	makeLabel(main, "RightCtrl  •  drag header to move", UDim2.new(1, -24, 0, 16), UDim2.new(0, 12, 0, 766), false, C.textFaint, 10, Enum.TextXAlignment.Center)
+
+	userInputService.InputBegan:Connect(function(input, processed)
+		if processed then return end
+		if input.KeyCode == Enum.KeyCode.RightControl then
+			uiVisible = not uiVisible
+			main.Visible = uiVisible
+		end
+	end)
+
+	close.MouseButton1Click:Connect(function()
+		for npc in pairs(trackedNpcs) do removeNpcEsp(npc) end
+		for totem in pairs(trackedTotems) do removeTotemEsp(totem) end
+		gui:Destroy()
+	end)
+
+	return gui
+end
+
+-- Main loop ---------------------------------------------------------------
+
+local function initializeScript()
+	buildUi()
+
+	task.spawn(function()
+		while task.wait(POLL_INTERVAL) do
+			local now = os.clock()
+			local money = getMoney()
+
+			if money and not sessionBaseline then
+				sessionBaseline = money
+				sessionBaselineSetAt = now
+			end
+			if money and now - sessionBaselineSetAt >= SESSION_RESET_INTERVAL then
+				sessionBaseline = money
+				sessionBaselineSetAt = now
+			end
+
+			local profit = (money and sessionBaseline) and (money - sessionBaseline) or 0
+
+			if moneyValue then
+				moneyValue.Text = money and ("$" .. commaFormat(money)) or "$--"
+			end
+			if profitValue then
+				if not money then
+					profitValue.Text = "--"
+					profitValue.TextColor3 = C.textDim
+				elseif profit > 0 then
+					profitValue.Text = "+$" .. commaFormat(profit)
+					profitValue.TextColor3 = C.green
+				elseif profit < 0 then
+					profitValue.Text = "-$" .. commaFormat(-profit)
+					profitValue.TextColor3 = C.red
+				else
+					profitValue.Text = "$0"
+					profitValue.TextColor3 = C.textDim
+				end
+			end
+
+			local current, max = readInventory()
+			if inventoryValue then
+				if current and max then
+					inventoryValue.Text = tostring(current) .. "/" .. tostring(max)
+					inventoryValue.TextColor3 = (current >= max * SELL_THRESHOLD) and C.amber or C.green
+				else
+					inventoryValue.Text = "--/--"
+				end
+			end
+
+			if autoSell and current and max then
+				local full = current >= max * SELL_THRESHOLD
+				if full then
+					if not sellArmedAt then
+						sellArmedAt = now
+					elseif now - sellArmedAt >= SELL_DELAY and now - lastSellTime >= SELL_COOLDOWN then
+						lastSellTime = now
+						sellArmedAt = nil
+						if sellAll() then
+							sellCount = sellCount + 1
+							if sellCountLabel then sellCountLabel.Text = tostring(sellCount) end
+						end
+					end
+				else
+					sellArmedAt = nil
+				end
+			else
+				sellArmedAt = nil
+			end
+		end
+	end)
+
+	task.spawn(function()
+		while task.wait(NPC_SCAN_INTERVAL) do
+			pcall(scanNpcEsp)
+		end
+	end)
+
+	task.spawn(function()
+		while task.wait(TOTEM_SCAN_INTERVAL) do
+			pcall(scanTotems)
+		end
+	end)
+
+	task.spawn(function()
+		runService.RenderStepped:Connect(function()
+			pcall(updateTracers)
+		end)
+	end)
+
+	task.spawn(function()
+		while task.wait(0.1) do
+			pcall(runJumpTick)
+		end
+	end)
+end
+
+xpcall(initializeScript, function(err)
+	warn("Failed to initialize.")
+	warn(err)
+	warn(debug.traceback())
+end)
