@@ -248,7 +248,6 @@ local function getNpcAnchor(model)
 	return model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head")
 end
 
--- Gets the topmost part of the model for name positioning.
 local function getNpcHeadTop(model)
 	local head = model:FindFirstChild("Head")
 	if head then
@@ -261,7 +260,6 @@ local function getNpcHeadTop(model)
 	return nil
 end
 
--- Returns the display name to show above the NPC.
 local function getNpcDisplayName(model)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if humanoid and humanoid.DisplayName and humanoid.DisplayName ~= "" then
@@ -341,7 +339,6 @@ end
 
 local function applyNpcEspState()
 	for npc, data in pairs(trackedNpcs) do
-		-- Highlight.
 		if npcHighlightEnabled and not data.highlight then
 			local hl = Instance.new("Highlight")
 			hl.Name = "PotentNpcHighlight"
@@ -359,7 +356,6 @@ local function applyNpcEspState()
 			data.highlight.Enabled = npcEspEnabled and npcHighlightEnabled
 		end
 
-		-- Tracer.
 		if npcTracerEnabled and not data.tracer then
 			data.tracer = createTracer()
 		end
@@ -367,7 +363,6 @@ local function applyNpcEspState()
 			data.tracer.Visible = false
 		end
 
-		-- Name tag.
 		if npcNameEnabled and not data.nameTag then
 			data.nameTag = createNameTag()
 			data.nameTag.Text = getNpcDisplayName(npc)
@@ -408,7 +403,6 @@ local function updateTracers()
 	local origin = Vector2.new(viewport.X / 2, viewport.Y - 40)
 
 	for npc, data in pairs(trackedNpcs) do
-		-- Tracer update.
 		if npcTracerEnabled and data.tracer then
 			local line = data.tracer
 			if npc.Parent then
@@ -430,7 +424,6 @@ local function updateTracers()
 			end
 		end
 
-		-- Name tag update.
 		if npcNameEnabled and data.nameTag then
 			local tag = data.nameTag
 			if npc.Parent then
@@ -439,7 +432,6 @@ local function updateTracers()
 					local screenPos, onScreen = camera:WorldToViewportPoint(topPos)
 					if onScreen then
 						tag.Position = Vector2.new(screenPos.X, screenPos.Y)
-						-- Refresh name in case DisplayName changed.
 						local currentName = getNpcDisplayName(npc)
 						if tag.Text ~= currentName then
 							tag.Text = currentName
@@ -673,6 +665,7 @@ local function makeSectionTitle(parent, text, yOffset)
 	makeCorner(bar, 2)
 
 	makeLabel(holder, text:upper(), UDim2.new(1, -10, 1, 0), UDim2.new(0, 10, 0, 0), true, C.textDim, 10)
+	return holder
 end
 
 local function makeWideCard(parent, title, subtitle, valueColor, yOffset)
@@ -797,14 +790,18 @@ local function buildUi()
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Parent = gethui and gethui() or localPlayer:WaitForChild("PlayerGui")
 
+	local FULL_HEIGHT = 810
+	local MIN_HEIGHT = 44
+
 	local main = Instance.new("Frame")
 	main.Name = "Main"
-	main.Size = UDim2.new(0, 320, 0, 810)
+	main.Size = UDim2.new(0, 320, 0, FULL_HEIGHT)
 	main.Position = UDim2.new(1, -340, 0, 60)
 	main.BackgroundColor3 = C.bg
 	main.BorderSizePixel = 0
 	main.Active = true
 	main.Draggable = true
+	main.ClipsDescendants = true
 	main.Parent = gui
 	makeCorner(main, 12)
 	makeStroke(main, C.accent, 1, 0.4)
@@ -835,6 +832,7 @@ local function buildUi()
 	makeLabel(header, "Potent", UDim2.new(0, 100, 1, 0), UDim2.new(0, 30, 0, 0), true, C.text, 15)
 	makeLabel(header, "tracker", UDim2.new(1, -140, 1, 0), UDim2.new(0, 88, 0, 0), false, C.textFaint, 12)
 
+	-- Close button.
 	local close = Instance.new("TextButton")
 	close.Size = UDim2.new(0, 26, 0, 26)
 	close.Position = UDim2.new(1, -38, 0.5, -13)
@@ -856,14 +854,44 @@ local function buildUi()
 		close.TextColor3 = C.textDim
 	end)
 
+	-- Minimize button (added).
+	local minimize = Instance.new("TextButton")
+	minimize.Size = UDim2.new(0, 26, 0, 26)
+	minimize.Position = UDim2.new(1, -68, 0.5, -13)
+	minimize.BackgroundColor3 = C.cardAlt
+	minimize.Text = "–"
+	minimize.Font = FONT_BOLD
+	minimize.TextColor3 = C.textDim
+	minimize.TextSize = 16
+	minimize.BorderSizePixel = 0
+	minimize.AutoButtonColor = false
+	minimize.Parent = header
+	makeCorner(minimize, 6)
+	minimize.MouseEnter:Connect(function()
+		minimize.BackgroundColor3 = C.accent
+		minimize.TextColor3 = Color3.new(1, 1, 1)
+	end)
+	minimize.MouseLeave:Connect(function()
+		minimize.BackgroundColor3 = C.cardAlt
+		minimize.TextColor3 = C.textDim
+	end)
+
+	-- Container for everything below the header (so we can hide in one go).
+	local body = Instance.new("Frame")
+	body.Name = "Body"
+	body.Size = UDim2.new(1, 0, 1, -44)
+	body.Position = UDim2.new(0, 0, 0, 44)
+	body.BackgroundTransparency = 1
+	body.Parent = main
+
 	-- Earnings.
-	makeSectionTitle(main, "Earnings", 58)
-	profitValue = makeWideCard(main, "Session Profit", "reset 10m", C.green, 78)
-	moneyValue = makeWideCard(main, "Money", "total", C.amber, 150)
+	makeSectionTitle(body, "Earnings", 14)
+	profitValue = makeWideCard(body, "Session Profit", "reset 10m", C.green, 34)
+	moneyValue = makeWideCard(body, "Money", "total", C.amber, 106)
 
 	-- Fast Travel.
-	makeSectionTitle(main, "Fast Travel", 226)
-	makeActionButton(main, "Open Fast Travel UI", 246, C.accent, function()
+	makeSectionTitle(body, "Fast Travel", 182)
+	makeActionButton(body, "Open Fast Travel UI", 202, C.accent, function()
 		local ok, method = openFastTravel()
 		if not ok then
 			warn("[Potent] Fast travel gagal: " .. tostring(method))
@@ -871,30 +899,30 @@ local function buildUi()
 	end)
 
 	-- NPC ESP.
-	makeSectionTitle(main, "NPC ESP", 288)
+	makeSectionTitle(body, "NPC ESP", 244)
 
-	makeSwitch(main, "NPC ESP", 308, C.green, function(state)
+	makeSwitch(body, "NPC ESP", 264, C.green, function(state)
 		npcEspEnabled = state
 		applyNpcEspState()
 	end)
-	makeSwitch(main, "Tracer", 346, C.cyan, function(state)
+	makeSwitch(body, "Tracer", 302, C.cyan, function(state)
 		npcTracerEnabled = state
 		applyNpcEspState()
 	end, true)
-	makeSwitch(main, "Highlight", 384, C.green, function(state)
+	makeSwitch(body, "Highlight", 340, C.green, function(state)
 		npcHighlightEnabled = state
 		applyNpcEspState()
 	end, true)
-	makeSwitch(main, "Show Name", 422, C.amber, function(state)
+	makeSwitch(body, "Show Name", 378, C.amber, function(state)
 		npcNameEnabled = state
 		applyNpcEspState()
 	end, true)
 
 	local npcRow = Instance.new("Frame")
 	npcRow.Size = UDim2.new(1, -24, 0, 24)
-	npcRow.Position = UDim2.new(0, 12, 0, 464)
+	npcRow.Position = UDim2.new(0, 12, 0, 420)
 	npcRow.BackgroundTransparency = 1
-	npcRow.Parent = main
+	npcRow.Parent = body
 
 	makeLabel(npcRow, "NPC terdeteksi", UDim2.new(1, -50, 1, 0), UDim2.new(0, 4, 0, 0), false, C.textDim, 11)
 
@@ -909,9 +937,9 @@ local function buildUi()
 	npcCountLabel = makeLabel(pill, "0", UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), true, C.orange, 11, Enum.TextXAlignment.Center)
 
 	-- Totem ESP.
-	makeSectionTitle(main, "Totem ESP", 494)
+	makeSectionTitle(body, "Totem ESP", 450)
 
-	makeSwitch(main, "Totem ESP", 514, C.pink, function(state)
+	makeSwitch(body, "Totem ESP", 470, C.pink, function(state)
 		totemEspEnabled = state
 		for _, hl in pairs(trackedTotems) do
 			hl.Enabled = state
@@ -919,10 +947,10 @@ local function buildUi()
 	end)
 
 	-- Automation.
-	makeSectionTitle(main, "Automation", 558)
+	makeSectionTitle(body, "Automation", 514)
 
-	makeSwitch(main, "Auto Jump", 578, C.blue, function(state) autoJump = state end)
-	makeSwitch(main, "Auto Sell", 616, C.green, function(state)
+	makeSwitch(body, "Auto Jump", 534, C.blue, function(state) autoJump = state end)
+	makeSwitch(body, "Auto Sell", 572, C.green, function(state)
 		autoSell = state
 		if not state then sellArmedAt = nil end
 	end)
@@ -930,10 +958,10 @@ local function buildUi()
 	-- Footer.
 	local footer = Instance.new("Frame")
 	footer.Size = UDim2.new(1, -24, 0, 58)
-	footer.Position = UDim2.new(0, 12, 0, 662)
+	footer.Position = UDim2.new(0, 12, 0, 618)
 	footer.BackgroundColor3 = C.card
 	footer.BorderSizePixel = 0
-	footer.Parent = main
+	footer.Parent = body
 	makeCorner(footer, 10)
 	makeStroke(footer, C.stroke, 1, 0.7)
 
@@ -943,14 +971,44 @@ local function buildUi()
 	makeLabel(footer, "SOLD", UDim2.new(0, 50, 0, 10), UDim2.new(1, -94, 0, 8), true, C.textFaint, 9, Enum.TextXAlignment.Right)
 	sellCountLabel = makeLabel(footer, "0", UDim2.new(0, 80, 0, 20), UDim2.new(1, -94, 0, 22), true, C.green, 15, Enum.TextXAlignment.Right)
 
-	makeActionButton(main, "Sell Sekarang", 726, C.cardAlt, function()
+	makeActionButton(body, "Sell Sekarang", 682, C.cardAlt, function()
 		if sellAll() then
 			sellCount = sellCount + 1
 			if sellCountLabel then sellCountLabel.Text = tostring(sellCount) end
 		end
 	end)
 
-	makeLabel(main, "RightCtrl  •  drag header to move", UDim2.new(1, -24, 0, 16), UDim2.new(0, 12, 0, 766), false, C.textFaint, 10, Enum.TextXAlignment.Center)
+	makeLabel(body, "RightCtrl  •  drag header to move", UDim2.new(1, -24, 0, 16), UDim2.new(0, 12, 0, 722), false, C.textFaint, 10, Enum.TextXAlignment.Center)
+
+	-- Minimize toggle.
+	local minimized = false
+	local function setMinimized(state)
+		minimized = state
+		if state then
+			body.Visible = false
+			main.Size = UDim2.new(0, 320, 0, MIN_HEIGHT)
+			minimize.Text = "+"
+			minimize.BackgroundColor3 = C.accent
+			minimize.TextColor3 = Color3.new(1, 1, 1)
+		else
+			body.Visible = true
+			main.Size = UDim2.new(0, 320, 0, FULL_HEIGHT)
+			minimize.Text = "–"
+			minimize.BackgroundColor3 = C.cardAlt
+			minimize.TextColor3 = C.textDim
+		end
+	end
+
+	minimize.MouseButton1Click:Connect(function()
+		setMinimized(not minimized)
+	end)
+
+	-- Double-click the header to minimize/restore quickly.
+	header.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			-- Handled in InputEnded instead to avoid interfering with Draggable.
+		end
+	end)
 
 	userInputService.InputBegan:Connect(function(input, processed)
 		if processed then return end
